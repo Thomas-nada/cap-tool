@@ -7,6 +7,7 @@ export function renderNav(state) {
     const menu = [
         { id: 'dashboard', label: 'Home', icon: 'home' },
         { id: 'list', label: 'Registry', icon: 'database' },
+        { id: 'kanban', label: 'Kanban', icon: 'columns' },
         { id: 'constitution', label: 'Constitution', icon: 'book-open' },
         { id: 'learn', label: 'Guides', icon: 'book' },
         { id: 'wizard', label: 'New CAP', icon: 'plus-square' }

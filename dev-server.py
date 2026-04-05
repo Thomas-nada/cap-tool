@@ -2,16 +2,18 @@
 Combined dev server for CAP Portal + local repo preview.
 
 Serves the portal from this directory on port 8765.
-Requests to /local-repo/* are served from E:/CAP instead.
+Requests to /local-repo/* are served from a configurable repo path.
 
-Usage: python dev-server.py
+Usage: python dev-server.py [port] [repo-dir]
+  port      - Port to serve on (default: 8765)
+  repo-dir  - Path to local CAP repo (default: parent directory)
 """
 import os
 import sys
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 
 PORTAL_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_DIR = os.path.normpath("E:/CAP")
+REPO_DIR = os.path.normpath(sys.argv[2] if len(sys.argv) > 2 else os.path.join(PORTAL_DIR, ".."))
 LOCAL_PREFIX = "/local-repo"
 
 class CombinedHandler(SimpleHTTPRequestHandler):

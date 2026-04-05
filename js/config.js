@@ -1,12 +1,14 @@
 /**
  * Project Configuration
- * Stores repository details and third-party service credentials.
+ * Reads credentials from env.local.js (local development).
  */
 
-// GitHub Repository Configuration
+import { ENV } from '../env.local.js';
+
+// GitHub Repository Configuration (uses env.local.js overrides when present)
 export const GITHUB_CONFIG = {
-    REPO_OWNER: "Thomas-nada",
-    REPO_NAME: "cap",
+    REPO_OWNER: ENV.REPO_OWNER || "Thomas-nada",
+    REPO_NAME: ENV.REPO_NAME || "cap",
     API_BASE: "https://api.github.com"
 };
 
@@ -15,15 +17,10 @@ export const GITHUB_CONFIG = {
 // Set to null to use GitHub (production default).
 export const LOCAL_CONSTITUTION_BASE = null;
 
-// Firebase Configuration
-// These values are used to initialize the governance backend and audit logging.
-export const FIREBASE_CONFIG = {
-    apiKey: "AIzaSyB3yRAXBHX2x488HpUZB4qjJ9N--wlGdCM",
-    authDomain: "cap-process.firebaseapp.com",
-    projectId: "cap-process",
-    storageBucket: "cap-process.firebasestorage.app",
-    messagingSenderId: "363523276859",
-    appId: "1:363523276859:web:1ec912836f32e4d072b72f"
+// Local auth from env.local.js (replaces Firebase)
+export const LOCAL_AUTH = {
+    GITHUB_TOKEN: ENV.GITHUB_TOKEN || "",
+    GITHUB_USERNAME: ENV.GITHUB_USERNAME || ""
 };
 
 // Application Constants

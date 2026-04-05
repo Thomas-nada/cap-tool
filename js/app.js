@@ -1,17 +1,4 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { 
-    getAuth, 
-    signInAnonymously, 
-    onAuthStateChanged, 
-    GithubAuthProvider, 
-    signInWithPopup, 
-    signOut 
-} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { 
-    getFirestore 
-} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-import { FIREBASE_CONFIG, APP_ID } from './config.js';
+import { LOCAL_AUTH, APP_ID } from './config.js';
 import { 
     ghFetch, 
     fetchAllProposals, 
@@ -41,11 +28,13 @@ import { renderEdit } from './components/edit.js';
 import { renderConstitution } from './components/constitution.js';
 import { renderWizard } from './components/wizard.js';
 import { renderLearnHub } from './components/learn.js';
+import { renderKanban, initKanbanHandlers } from './components/kanban.js';
 
-// --- Initialize Firebase Services ---
-const app = initializeApp(FIREBASE_CONFIG);
-const auth = getAuth(app);
-const db = getFirestore(app);
+// --- Local Auth (no Firebase) ---
+// Use token from env.local.js or localStorage fallback
+if (LOCAL_AUTH.GITHUB_TOKEN && !localStorage.getItem('gh_token')) {
+    localStorage.setItem('gh_token', LOCAL_AUTH.GITHUB_TOKEN);
+}
 
 // --- Toast Notification System ---
 window.showToast = (title, message, type = 'info') => {
@@ -189,10 +178,20 @@ window.state = {
     
     // Search and filter state
     searchQuery: '',
-    statusFilter: 'all'  // 'all', 'open', 'closed'
+    statusFilter: 'all',  // 'all', 'open', 'closed'
+
+    // Kanban state
+    kanbanCollapsed: [],
+    kanbanTagPanelOpen: false,
+    kanbanTypeFilter: 'ALL',
+    kanbanSearch: '',
+    kanbanPreviewProposal: null
 };
 
 const state = window.state;
+
+// --- Initialize Kanban Handlers ---
+initKanbanHandlers(state);
 
 // --- Markdown Formatting Logic ---
 
@@ -279,6 +278,9 @@ window.handleRouting = async () => {
         }
     } else if (hash === '#/wizard') {
         state.view = 'wizard';
+    } else if (hash === '#/kanban') {
+        state.view = 'kanban';
+        loadProposals();
     } else if (hash.startsWith('#/learn/')) {
         // Guide route: #/learn/{slug}
         const slug = hash.replace('#/learn/', '');
@@ -302,6 +304,7 @@ window.setView = (view) => {
         'constitution': '#/constitution', 
         'create': '#/create',
         'wizard': '#/wizard',
+        'kanban': '#/kanban',
         'learn': '#/learn'
     };
     if (routes[view]) {
@@ -331,22 +334,40 @@ window.updateUI = async function(force = false) {
 
     state.lastRenderedView = state.view;
     state.lastRenderedTheme = state.theme;
+
+    // Clean up detail overlay if leaving kanban view
+    if (state.view !== 'kanban') {
+        const overlay = document.getElementById('kanban-detail-overlay');
+        if (overlay) overlay.remove();
+        root.classList.remove('kanban-preview-active');
+        state.kanbanPreviewProposal = null;
+    }
     document.documentElement.className = state.theme;
 
     if (!state.ghToken) {
         root.innerHTML = renderLanding();
     } else {
+        const isKanban = state.view === 'kanban';
+        const mainCls = isKanban
+            ? 'flex-grow overflow-hidden px-4 pt-4 pb-2'
+            : 'flex-grow container mx-auto px-6 py-12 max-w-7xl';
         root.innerHTML = `
             <div id="toast-container" class="fixed top-24 right-8 z-[300] space-y-3" style="max-width: 400px;"></div>
             <div class="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white transition-colors duration-300 text-left">
                 ${renderNav(state)}
-                <main id="main-content" class="flex-grow container mx-auto px-6 py-12 max-w-7xl">
+                <main id="main-content" class="${mainCls}">
                     ${renderActiveView()}
                 </main>
             </div>`;
     }
     if (window.lucide) window.lucide.createIcons();
     if (window.fixPreCode) window.fixPreCode();
+    if (state.view === 'kanban' && window.kanbanInitScroll) window.kanbanInitScroll();
+    if (state.view === 'kanban' && window.kanbanInitCollapseAnimations) window.kanbanInitCollapseAnimations();
+    if (state.view === 'kanban' && window.kanbanStartPolling) window.kanbanStartPolling();
+    if (state.view !== 'kanban' && window.kanbanStopPolling) window.kanbanStopPolling();
+    if (state.view !== 'kanban' && window.kanbanCloseTagPanel) window.kanbanCloseTagPanel();
+    if (state.view !== 'kanban' && window.kanbanClosePreview) window.kanbanClosePreview();
 };
 
 function renderActiveView() {
@@ -359,6 +380,7 @@ function renderActiveView() {
         case 'constitution': return renderConstitution(state);
         case 'wizard': return renderWizard(state);
         case 'learn': return renderLearnHub(state);
+        case 'kanban': return renderKanban(state);
         default: return '<p class="text-slate-400">Unknown view.</p>';
     }
 }
@@ -967,21 +989,30 @@ window.deleteProposal = async (n) => {
 // --- Authentication & Theme ---
 
 window.login = async () => {
-    const provider = new GithubAuthProvider();
-    provider.addScope('repo');
-    try {
-        const res = await signInWithPopup(auth, provider);
-        const credential = GithubAuthProvider.credentialFromResult(res);
-        localStorage.setItem('gh_token', credential.accessToken);
-        state.ghToken = credential.accessToken;
-        window.location.hash = '#/home';
-    } catch (error) { state.error = error.message; window.updateUI(true); }
+    // With local env, the token is already set from env.local.js
+    // If it's not set, prompt the user
+    if (!state.ghToken) {
+        const token = prompt('Enter your GitHub Personal Access Token:');
+        if (token) {
+            localStorage.setItem('gh_token', token);
+            state.ghToken = token;
+            try {
+                state.ghUser = await ghFetch('/user', state.ghToken);
+                window.location.hash = '#/home';
+                window.updateUI(true);
+            } catch (e) {
+                localStorage.removeItem('gh_token');
+                state.ghToken = null;
+                alert('Invalid token. Please check and try again.');
+            }
+        }
+    }
 };
 
-window.logout = async () => {
-    await signOut(auth);
+window.logout = () => {
     localStorage.removeItem('gh_token');
     state.ghToken = null;
+    state.ghUser = null;
     window.location.hash = '';
     window.updateUI(true);
 };
@@ -1293,23 +1324,20 @@ if (document.readyState === 'loading') {
     checkWizardRecovery();
 }
 
-// --- Lifecycle Initialization ---
+// --- Lifecycle Initialization (local auth, no Firebase) ---
 
-onAuthStateChanged(auth, async (user) => {
-    state.user = user;
+(async function initApp() {
     if (state.ghToken) {
         try {
             state.ghUser = await ghFetch('/user', state.ghToken);
-            window.handleRouting();
-        } catch (e) { 
-            localStorage.removeItem('gh_token'); 
-            state.ghToken = null; 
+        } catch (e) {
+            localStorage.removeItem('gh_token');
+            state.ghToken = null;
         }
-    } else {
-        await signInAnonymously(auth);
     }
     state.loading.init = false;
+    window.handleRouting();
     window.updateUI(true);
-});
+})();
 
 window.onhashchange = window.handleRouting;
