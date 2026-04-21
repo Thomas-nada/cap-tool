@@ -589,32 +589,19 @@ function buildDetailPanelHTML(proposal) {
 // ──────────────────────────────────────────────
 
 function renderFilterBar(state, totalCount, filteredCount) {
-    const typeFilter = state.kanbanTypeFilter || 'ALL';
-    const types = ['ALL', 'CAP', 'CIS'];
-
     return `
     <div class="flex items-center gap-3 flex-wrap">
-        <!-- Type toggle -->
-        <div class="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-0.5">
-            ${types.map(t => `
-            <button onclick="window.kanbanSetTypeFilter('${t}')"
-                class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all
-                ${typeFilter === t ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}">
-                ${t}
-            </button>`).join('')}
-        </div>
-
         <!-- Search -->
         <div class="relative flex-1 max-w-xs">
             <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
-            <input type="text" placeholder="Filter proposals..."
+            <input type="text" placeholder="Filter CAPs..."
                 value="${escapeHtml(state.kanbanSearch || '')}"
                 onkeyup="window.kanbanSetSearch(this.value)"
                 class="w-full pl-9 pr-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 outline-none transition-all" />
         </div>
 
         <span class="text-[11px] text-slate-400 font-bold">
-            ${filteredCount === totalCount ? `${totalCount} proposals` : `${filteredCount} of ${totalCount}`}
+            ${filteredCount === totalCount ? `${totalCount} CAPs` : `${filteredCount} of ${totalCount} CAPs`}
         </span>
     </div>`;
 }
@@ -625,19 +612,11 @@ function renderFilterBar(state, totalCount, filteredCount) {
 
 export function renderKanban(state) {
     const proposals = state.proposals || [];
-    const typeFilter = state.kanbanTypeFilter || 'ALL';
     const searchQ = (state.kanbanSearch || '').toLowerCase();
     const tagPanelOpen = state.kanbanTagPanelOpen || false;
 
-    // Filter
-    let filtered = proposals;
-    if (typeFilter !== 'ALL') {
-        filtered = filtered.filter(p =>
-            typeFilter === 'CIS'
-                ? p.labels.some(l => l.name === 'CIS')
-                : !p.labels.some(l => l.name === 'CIS')
-        );
-    }
+    // Filter — Progress Tracker is CAP-only; CISs have no ratification lifecycle
+    let filtered = proposals.filter(p => !p.labels.some(l => l.name === 'CIS'));
     if (searchQ) {
         filtered = filtered.filter(p =>
             (p.title || '').toLowerCase().includes(searchQ) ||
@@ -938,11 +917,7 @@ export function initKanbanHandlers(state) {
         }
     };
 
-    // Filters
-    window.kanbanSetTypeFilter = (type) => {
-        state.kanbanTypeFilter = type;
-        window.updateUI(true);
-    };
+
 
     window.kanbanSetSearch = (q) => {
         state.kanbanSearch = q;

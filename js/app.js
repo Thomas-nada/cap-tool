@@ -31,7 +31,7 @@ import { renderEdit } from './components/edit.js?v=2';
 import { renderConstitution } from './components/constitution.js?v=7';
 import { renderWizard } from './components/wizard.js?v=2';
 import { renderLearnHub } from './components/learn.js?v=4';
-import { initKanbanHandlers } from './components/kanban.js?v=14';
+import { initKanbanHandlers } from './components/kanban.js?v=15';
 
 
 // --- Toast Notification System ---
@@ -391,7 +391,6 @@ window.state = {
     // Kanban state
     kanbanCollapsed: [],
     kanbanTagPanelOpen: false,
-    kanbanTypeFilter: 'ALL',
     kanbanSearch: '',
     kanbanPreviewProposal: null
 };
