@@ -25,7 +25,7 @@ import {
 import { renderNav } from './components/nav.js?v=5';
 import { renderDashboard } from './components/dashboard.js?v=3';
 import { renderRegistry } from './components/registry.js?v=7';
-import { renderDetail } from './components/detail.js?v=9';
+import { renderDetail } from './components/detail.js?v=10';
 import { renderCreate } from './components/create.js?v=2';
 import { renderEdit } from './components/edit.js?v=2';
 import { renderConstitution } from './components/constitution.js?v=13';
@@ -795,6 +795,14 @@ window.handleEdit = async (event) => {
             const path = `institutional-exhibits/${p.number}-${file.name}`;
             await uploadFileToRepo(path, file.base64, `Add exhibit for ${type} #${p.number}`, state.ghToken);
         }
+
+        // Post a non-blocking audit record so the edit appears in the proposal trail
+        const editTimestamp = new Date().toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+        postProposalComment(
+            p.number,
+            `<!-- PORTAL:EDIT_AUDIT -->\n✏️ **Proposal edited** by @${state.ghUser?.login || 'author'} — ${editTimestamp}`,
+            state.ghToken
+        ).catch(() => {}); // non-critical — silently ignore if audit comment fails
 
         state.editFiles = [];
         window.showToast('Updated', `${type} #${p.number} updated successfully.`, 'success');

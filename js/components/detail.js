@@ -124,17 +124,21 @@ export function renderDetail(state) {
 
                     <!-- Comments and Discussion -->
                     <section class="space-y-12 pt-16 border-t border-slate-100 dark:border-slate-800">
+                        ${(() => {
+                            const AUDIT_MARKER = '<!-- PORTAL:EDIT_AUDIT -->';
+                            const discussionComments = state.comments.filter(c => !c.body.includes(AUDIT_MARKER));
+                            return `
                         <div class="flex items-center justify-between px-4">
                             <h2 class="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Discussion</h2>
-                            <span class="text-[10px] font-black text-blue-600 uppercase tracking-widest">${state.comments.length} ${state.comments.length === 1 ? 'Comment' : 'Comments'}</span>
+                            <span class="text-[10px] font-black text-blue-600 uppercase tracking-widest">${discussionComments.length} ${discussionComments.length === 1 ? 'Comment' : 'Comments'}</span>
                         </div>
-                        
+
                         <div class="space-y-8">
-                            ${state.comments.length === 0 ? `
+                            ${discussionComments.length === 0 ? `
                                 <div class="p-20 text-center border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-[3rem]">
                                     <p class="text-slate-400 font-bold uppercase tracking-widest text-xs">No comments yet.</p>
                                 </div>
-                            ` : state.comments.map(comment => `
+                            ` : discussionComments.map(comment => `
                                 <div class="flex gap-8 group">
                                     <img src="${comment.user.avatar_url}" class="w-14 h-14 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 flex-shrink-0 transition-transform group-hover:scale-105">
                                     <div class="flex-grow space-y-4">
@@ -204,6 +208,7 @@ export function renderDetail(state) {
                                 `}
                             </div>
                         </div>
+                        `; })()}
                     </section>
                 </div>
 
@@ -226,7 +231,19 @@ export function renderDetail(state) {
 
                         ${(() => {
                             const AUDIT_LIMIT = 5;
-                            const allEvents = state.proposalEvents || [];
+                            const AUDIT_MARKER = '<!-- PORTAL:EDIT_AUDIT -->';
+                            // Merge edit audit comments into the events list as synthetic events
+                            const editAuditItems = (state.comments || [])
+                                .filter(c => c.body.includes(AUDIT_MARKER))
+                                .map(c => ({
+                                    id: `edit-${c.id}`,
+                                    event: 'portal_edit',
+                                    actor: c.user,
+                                    created_at: c.created_at,
+                                    _editBody: c.body.replace(AUDIT_MARKER, '').trim()
+                                }));
+                            const allEvents = [...(state.proposalEvents || []), ...editAuditItems]
+                                .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
                             const isExpanded = state.auditTrailExpanded;
                             const visibleEvents = isExpanded ? allEvents : allEvents.slice(0, AUDIT_LIMIT);
                             const hasMore = allEvents.length > AUDIT_LIMIT;
@@ -701,6 +718,13 @@ function getEventDetails(event) {
             details.color = 'text-emerald-600';
             details.message = `Added to Milestone: ${event.milestone?.title}`;
             details.fullDescription = `This entry is now tracking toward the objective: **${event.milestone?.title}**.`;
+            break;
+
+        case 'portal_edit':
+            details.icon = 'pencil';
+            details.color = 'text-blue-500';
+            details.message = '✏️ Proposal Edited';
+            details.fullDescription = event._editBody || `**${event.actor?.login || 'The author'}** edited this proposal.`;
             break;
     }
 
