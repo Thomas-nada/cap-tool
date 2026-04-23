@@ -44,7 +44,7 @@ export function renderEdit(state) {
         if (applyFields) {
             const fieldMap = {
                 'Summary': 'abstract', 'Abstract': 'abstract',
-                'Structured Revisions (Contextual)': 'revisions',
+                'Structured Revisions (Contextual)': 'revisions', 'Revisions': 'revisions',
                 'Why is this change needed?': 'motivation', 'Motivation': 'motivation',
                 'Problem': 'motivation', 'Statement of Problem': 'motivation',
                 'Analysis & Test': 'analysis', 'Context': 'analysis',
@@ -185,8 +185,8 @@ export function renderEdit(state) {
                     </div>
                     <p class="text-xs font-bold text-slate-400 px-4 mb-4">Modify the combined contextual revision block below.</p>
                     ${renderToolbar('edit-revisions')}
-                    <textarea name="revisions" id="edit-revisions" required 
-                        class="w-full bg-slate-50 dark:bg-slate-950 p-8 rounded-[3rem] min-h-[300px] font-mono text-sm outline-none border-2 border-transparent focus:border-blue-600 transition-all text-slate-900 dark:text-white shadow-inner">${getSection('Structured Revisions (Contextual)')}</textarea>
+                    <textarea name="revisions" id="edit-revisions" required
+                        class="w-full bg-slate-50 dark:bg-slate-950 p-8 rounded-[3rem] min-h-[300px] font-mono text-sm outline-none border-2 border-transparent focus:border-blue-600 transition-all text-slate-900 dark:text-white shadow-inner">${getSection('Structured Revisions (Contextual)') || getSection('Revisions')}</textarea>
                 </div>
 
                 <!-- Section 3: Why? / Motivation & Assets -->
