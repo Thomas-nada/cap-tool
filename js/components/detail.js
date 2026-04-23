@@ -320,9 +320,7 @@ export function renderDetail(state) {
                                                                         EVT-${event.id.toString().substring(0, 12)}
                                                                     </span>
                                                                 </div>
-                                                                <a href="${details.extUrl || event.html_url}" target="_blank" class="px-4 py-2 bg-slate-950 dark:bg-white text-white dark:text-slate-950 rounded-lg text-[8px] font-black uppercase tracking-widest hover:opacity-80 transition-opacity flex items-center gap-2">
-                                                                    <i data-lucide="external-link" class="w-2.5 h-2.5"></i> Verification
-                                                                </a>
+                                                                ${(() => { const vUrl = details.extUrl || event.html_url; return vUrl && vUrl !== 'undefined' ? `<a href="${vUrl}" target="_blank" class="px-4 py-2 bg-slate-950 dark:bg-white text-white dark:text-slate-950 rounded-lg text-[8px] font-black uppercase tracking-widest hover:opacity-80 transition-opacity flex items-center gap-2"><i data-lucide="external-link" class="w-2.5 h-2.5"></i> Verification</a>` : ''; })()}
                                                             </div>
                                                         </div>
                                                     ` : ''}
