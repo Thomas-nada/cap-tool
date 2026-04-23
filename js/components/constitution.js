@@ -234,6 +234,16 @@ export function renderConstitution(state) {
                         <p class="text-slate-500 text-xl font-medium mt-2">Foundational governance document</p>
                     </div>
                 </div>
+
+                ${!isDiffMode ? `
+                <div class="mt-6 flex items-start gap-3 px-5 py-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40 rounded-2xl">
+                    <i data-lucide="mouse-pointer-2" class="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5"></i>
+                    <p class="text-sm text-blue-700 dark:text-blue-300 font-medium leading-relaxed">
+                        <span class="font-black">Proposing a change?</span>
+                        Highlight any section of the text below. A small menu will appear — click <span class="font-black">+ CAP</span> to flag it as a Constitutional Amendment Proposal, or <span class="font-black">+ CIS</span> to flag it as a Constitutional Issue Statement. Your selections will appear as coloured pills above the document.
+                    </p>
+                </div>
+                ` : ''}
             </header>
 
             <!-- Main Grid -->
