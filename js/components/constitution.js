@@ -240,37 +240,13 @@ export function renderConstitution(state) {
             <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
                 <!-- Sidebar -->
                 <aside class="lg:col-span-1 space-y-6 sticky top-8 h-fit">
-                    ${!isDiffMode ? `
-                    <!-- Action Panel: pinned to top of sidebar -->
+                    ${!isDiffMode && wizardInProgress ? `
+                    <!-- Return to Wizard — only shown when a wizard session is active -->
                     <div class="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm">
-                        <h3 class="text-xs font-black uppercase tracking-[0.2em] text-slate-400 mb-3">Propose a Change</h3>
-                        ${state.ghToken ? `
-                        <p id="constitution-selection-summary" class="text-xs text-slate-500 dark:text-slate-400 mb-3">${window.currentSelection?.text ? `${window.currentSelection.text.length} chars selected` : 'Highlight text in the constitution to select it'}</p>
-                        <button onclick="window.addTextToCAP()"
-                            class="w-full px-4 py-2 rounded-xl bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 font-bold text-sm mb-2 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-all">
-                            <i data-lucide="plus" class="w-4 h-4 inline-block mr-2"></i>Add to CAP
-                        </button>
-                        <button onclick="window.addTextToCIS()"
-                            class="w-full px-4 py-2 rounded-xl bg-purple-50 dark:bg-purple-900/10 text-purple-600 dark:text-purple-400 font-bold text-sm mb-2 hover:bg-purple-100 dark:hover:bg-purple-900/20 transition-all">
-                            <i data-lucide="plus" class="w-4 h-4 inline-block mr-2"></i>Add to CIS
-                        </button>
-                        <button onclick="window.clearConstitutionSelection()"
-                            class="w-full px-4 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold text-sm hover:bg-slate-100 dark:hover:bg-slate-700 transition-all">
-                            <i data-lucide="x" class="w-4 h-4 inline-block mr-2"></i>Clear All
-                        </button>
-                        ${wizardInProgress ? `
                         <button onclick="window.returnToWizard()"
-                            class="w-full mt-2 px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-all">
+                            class="w-full px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-all">
                             <i data-lucide="arrow-left" class="w-4 h-4 inline-block mr-2"></i>Return to Wizard
                         </button>
-                        ` : ''}
-                        ` : `
-                        <p class="text-xs text-slate-400 mb-4">Login to select text and create proposals from the constitution.</p>
-                        <button onclick="window.loginWithGitHub()"
-                            class="w-full px-4 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-xs flex items-center justify-center gap-2 hover:scale-105 transition-all">
-                            <i data-lucide="github" class="w-4 h-4"></i> Login with GitHub
-                        </button>
-                        `}
                     </div>
                     ` : ''}
 
