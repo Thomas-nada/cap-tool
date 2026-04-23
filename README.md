@@ -10,7 +10,9 @@ A governance platform for managing Constitutional Amendment Proposals (CAPs) and
 
 - **Public read-only access** — anyone can browse proposals, view the constitution, and read guides without logging in
 - **GitHub OAuth login** — log in with your GitHub account to submit proposals and add comments
-- **Editor controls** — editors can manage lifecycle stages and signal labels (access managed via `editors.json`)
+- **Editor controls** — editors can manage lifecycle stages, signal labels, special handling flags, and suggest revisions directly on proposals (access managed via `editors.json`)
+- **Editor revision suggestions** — editors can suggest edits to a proposal using the actual proposal form; authors receive a notification card and can apply or dismiss the suggestion
+- **Audit trail** — every stage move, edit, signal change, and suggestion is recorded chronologically on the proposal; shows 5 most recent events with a "Show all" toggle
 - **Proposal Registry** — list and Kanban views with full-text search and filtering
 - **Constitution Viewer** — browse versions and compare diffs; select text to anchor CAP proposals
 - **Amendment Wizard** — step-by-step guided form for creating CAPs and CIS submissions
@@ -115,9 +117,16 @@ The portal reads from and writes to `Thomas-nada/cap` on GitHub.
 
 Required repo structure:
 - Issues enabled (proposals are stored as GitHub Issues)
-- Labels matching the lifecycle stages: `draft`, `submitted`, `review`, `consultation`, `revision`, `finalizing`, `ready`, `onchain`, `done`, `withdrawn`
+- Labels matching the lifecycle stages: `consultation`, `ready`, `done`, `withdrawn`
+- Labels for status tags: `review`, `revision`, `finalizing`, `onchain`
+- Labels for editor signals: `editor-ok`, `editor-concern`, `editor-suggested`
+- Labels for author signal: `author-ready`
+- Labels for special handling: `major`, `minor`, `bundle`, `fast-track`, `pause`
+- Type labels: `CAP`, `CIS`
 - `constitution/` folder with at least one `.md` constitution file
 - `editors.json` in the root listing GitHub usernames who have editor access
+
+> **Note:** `draft`, `submitted`, and `Deliberation-Period` are legacy labels from earlier versions. New submissions enter at the `consultation` stage. Existing proposals with these legacy labels can be advanced to `consultation` using the editor lifecycle controls.
 
 ---
 

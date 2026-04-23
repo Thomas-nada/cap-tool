@@ -62,9 +62,40 @@ Editor signals communicate your assessment of a proposal's quality. Only one can
 |---|---|
 | `editor-ok` | The proposal meets the required standards |
 | `editor-concern` | Issues need to be addressed before the proposal can advance |
-| `editor-suggested` | Non-blocking suggestions have been left for the author |
+| `editor-suggested` | A revision has been suggested for the author to review |
 
-These signals are visible to the author in their panel. Always accompany a signal with a comment explaining your reasoning.
+These signals are visible to the author in their panel. Always accompany `editor-ok` or `editor-concern` with a comment explaining your reasoning. The `editor-suggested` signal is set automatically when you use the **Suggest Revision** feature — do not set it manually.
+
+---
+
+## Suggesting Revisions
+
+The **Suggest Revision** feature lets you propose specific edits to a proposal without overwriting it. The author retains full control — they must explicitly apply or dismiss your suggestion.
+
+### How it works — editor side
+
+1. Open the proposal in the CAP Portal and go to your Editor Controls panel
+2. Click **Suggest Revision** — this opens the proposal form pre-filled with the current content
+3. Edit any fields you want to change (title, abstract, revisions, motivation, analysis, impact, supporting exhibits)
+4. Optionally add a reason in the **Reason** field explaining what you changed and why
+5. Click **Post Suggestion** — the portal posts a tagged comment with your suggested field values and automatically sets the `editor-suggested` signal
+
+The suggestion is now visible to the author in their Author Controls panel.
+
+### How it works — author side
+
+When an active unresolved suggestion exists, a violet card appears in the author's panel showing:
+- Which fields were changed
+- The editor's name and date
+
+The author has two options:
+
+| Action | What happens |
+|---|---|
+| **Apply Edit** | Opens the edit form pre-populated with the suggested field values. The author reviews, adjusts if needed, and saves. On save, the `editor-suggested` signal is removed and an "applied" audit entry is posted. |
+| **Dismiss** | Posts a "dismissed" marker to the audit trail and removes the `editor-suggested` signal. No changes are made to the proposal. |
+
+> Only one suggestion can be active at a time. Post a new suggestion only after the previous one has been applied or dismissed.
 
 ---
 
@@ -87,8 +118,11 @@ These signals are visible to the author in their panel. Always accompany a signa
 1. Open the proposal in the CAP Portal
 2. Read the full proposal carefully, including the Constitutional Issue Statement
 3. Apply `review` to signal you are actively working on it
-4. Leave a comment on GitHub with your initial assessment
-5. Apply the appropriate editor signal (`editor-ok`, `editor-concern`, or `editor-suggested`)
+4. Leave a comment with your initial assessment
+5. Apply the appropriate editor signal:
+   - `editor-ok` if the proposal meets standards
+   - `editor-concern` if issues need to be resolved — leave a comment explaining what must change
+   - Use **Suggest Revision** if you want to propose specific wording changes — this sets `editor-suggested` automatically
 6. Remove `review` once your assessment is complete
 
 ### When the author has addressed concerns
@@ -96,6 +130,7 @@ These signals are visible to the author in their panel. Always accompany a signa
 1. Re-read the revised proposal
 2. Update your editor signal if appropriate
 3. If satisfied, leave a comment confirming the proposal is ready to advance
+4. If you used Suggest Revision, check whether the author applied or dismissed it before proceeding
 
 ### When ready to move to Ready
 
@@ -136,10 +171,21 @@ Status tags:
   onchain     — submitted on-chain (Ready only)
 
 Editor signals (pick one):
-  editor-ok        — meets standards
-  editor-concern   — issues to resolve
-  editor-suggested — non-blocking suggestions
+  editor-ok        — meets standards (set manually, leave a comment)
+  editor-concern   — issues to resolve (set manually, leave a comment)
+  editor-suggested — revision suggested (set automatically by Suggest Revision)
+
+Suggest Revision workflow:
+  Editor:  Suggest Revision button → edit form → Post Suggestion
+           → tagged comment posted, editor-suggested label set
+  Author:  violet card appears → Apply Edit (pre-fills edit form)
+                               → Dismiss (posts dismissed marker)
+  On apply/dismiss: editor-suggested label removed automatically
 
 Special handling:
   major / minor / bundle / fast-track / pause
+
+Audit trail:
+  All stage moves, edits, signals, suggestions, applies and dismissals
+  are recorded. Shows 5 most recent — click "Show all" to expand.
 ```
