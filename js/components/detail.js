@@ -249,13 +249,13 @@ export function renderDetail(state) {
                             );
                             const syntheticEvents = systemComments.map(c => {
                                 if (c.body.includes(AUDIT_MARKER))
-                                    return { id: `audit-${c.id}`, event: 'portal_edit',               actor: c.user, created_at: c.created_at, _editBody: c.body.replace(AUDIT_MARKER, '').trim() };
+                                    return { id: `audit-${c.id}`, event: 'portal_edit',               actor: c.user, created_at: c.created_at, html_url: c.html_url, _editBody: c.body.replace(AUDIT_MARKER, '').trim() };
                                 if (c.body.includes(APPLIED_MARKER))
-                                    return { id: `applied-${c.id}`, event: 'portal_suggestion_applied',   actor: c.user, created_at: c.created_at };
+                                    return { id: `applied-${c.id}`, event: 'portal_suggestion_applied',   actor: c.user, created_at: c.created_at, html_url: c.html_url };
                                 if (c.body.includes(DISMISSED_MARKER))
-                                    return { id: `dismissed-${c.id}`, event: 'portal_suggestion_dismissed', actor: c.user, created_at: c.created_at };
+                                    return { id: `dismissed-${c.id}`, event: 'portal_suggestion_dismissed', actor: c.user, created_at: c.created_at, html_url: c.html_url };
                                 if (c.body.includes(SUGGESTION_MARKER))
-                                    return { id: `sug-${c.id}`, event: 'portal_suggestion',             actor: c.user, created_at: c.created_at };
+                                    return { id: `sug-${c.id}`, event: 'portal_suggestion',             actor: c.user, created_at: c.created_at, html_url: c.html_url };
                                 return null;
                             }).filter(Boolean);
 
@@ -822,6 +822,7 @@ function getEventDetails(event) {
             details.color = 'text-blue-500';
             details.message = '✏️ Proposal Edited';
             details.fullDescription = event._editBody || `**${event.actor?.login || 'The author'}** edited this proposal.`;
+            if (event.html_url) details.extUrl = event.html_url;
             break;
 
         case 'portal_suggestion':
@@ -829,6 +830,7 @@ function getEventDetails(event) {
             details.color = 'text-violet-500';
             details.message = `💡 Editor Suggested a Revision`;
             details.fullDescription = `**@${event.actor?.login || 'An editor'}** submitted a suggested revision for the author to review.`;
+            if (event.html_url) details.extUrl = event.html_url;
             break;
 
         case 'portal_suggestion_applied':
@@ -836,6 +838,7 @@ function getEventDetails(event) {
             details.color = 'text-green-600';
             details.message = `✅ Editor Suggestion Applied`;
             details.fullDescription = `**@${event.actor?.login || 'The author'}** accepted and applied the editor's suggested revision.`;
+            if (event.html_url) details.extUrl = event.html_url;
             break;
 
         case 'portal_suggestion_dismissed':
@@ -843,6 +846,7 @@ function getEventDetails(event) {
             details.color = 'text-slate-400';
             details.message = `❌ Editor Suggestion Dismissed`;
             details.fullDescription = `**@${event.actor?.login || 'The author'}** reviewed and declined the editor's suggested revision.`;
+            if (event.html_url) details.extUrl = event.html_url;
             break;
     }
 
