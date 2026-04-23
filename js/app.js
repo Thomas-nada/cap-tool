@@ -23,12 +23,12 @@ import {
 
 // Import UI Components
 import { renderNav } from './components/nav.js?v=5';
-import { renderDashboard } from './components/dashboard.js?v=2';
+import { renderDashboard } from './components/dashboard.js?v=3';
 import { renderRegistry } from './components/registry.js?v=7';
 import { renderDetail } from './components/detail.js?v=8';
 import { renderCreate } from './components/create.js?v=2';
 import { renderEdit } from './components/edit.js?v=2';
-import { renderConstitution } from './components/constitution.js?v=7';
+import { renderConstitution } from './components/constitution.js?v=8';
 import { renderWizard } from './components/wizard.js?v=2';
 import { renderLearnHub } from './components/learn.js?v=4';
 import { initKanbanHandlers } from './components/kanban.js?v=15';
@@ -1200,10 +1200,9 @@ async function loadProposals() {
         const ps = await fetchAllProposals(state.ghToken);
         state.proposals = ps;
         state.stats = {
-            total: ps.length,
-            draft: ps.filter(x => x.state === 'open').length,
-            review: 0,
-            final: ps.filter(x => x.state === 'closed').length
+            consultation: ps.filter(x => x.labels?.some(l => l.name === 'consultation')).length,
+            ready: ps.filter(x => x.labels?.some(l => l.name === 'ready')).length,
+            done: ps.filter(x => x.labels?.some(l => l.name === 'done')).length,
         };
     } catch (e) {
         if (e.message === "AUTH_EXPIRED") {

@@ -43,18 +43,57 @@ export function renderConstitution(state) {
     const wizardInProgress = localStorage.getItem('wizard_in_progress');
 
     // --- Text Selection System ---
-    // Initialize selection handler once globally. It now captures selections
-    // made inside the constitution view regardless of wizard state (but
-    // still disabled in diff mode). This ensures the Add buttons always work.
+    // Initialize selection handler once globally. Shows a floating popup
+    // near the selected text with Add to CAP / Add to CIS / Clear buttons.
     if (!window.selectionHandlerInitialized) {
         window.selectionHandlerInitialized = true;
+
+        // Show floating popup anchored above the selection
+        function showSelectionPopup(rect) {
+            let popup = document.getElementById('selection-popup');
+            if (!popup) {
+                popup = document.createElement('div');
+                popup.id = 'selection-popup';
+                popup.style.cssText = 'position:fixed;z-index:9999;display:flex;align-items:center;gap:6px;background:#1e293b;border-radius:14px;padding:6px 10px;box-shadow:0 8px 32px rgba(0,0,0,0.3);pointer-events:auto;';
+                document.body.appendChild(popup);
+            }
+            const isLoggedIn = !!window.state?.ghToken;
+            popup.innerHTML = isLoggedIn ? `
+                <button onclick="window.addTextToCAP();window.clearConstitutionSelection()" style="background:#2563eb;color:#fff;border:none;border-radius:10px;padding:5px 12px;font-size:11px;font-weight:800;cursor:pointer;letter-spacing:.05em;white-space:nowrap">+ CAP</button>
+                <button onclick="window.addTextToCIS();window.clearConstitutionSelection()" style="background:#7c3aed;color:#fff;border:none;border-radius:10px;padding:5px 12px;font-size:11px;font-weight:800;cursor:pointer;letter-spacing:.05em;white-space:nowrap">+ CIS</button>
+                <button onclick="window.clearConstitutionSelection()" style="background:transparent;color:#94a3b8;border:none;border-radius:10px;padding:5px 8px;font-size:13px;font-weight:900;cursor:pointer;line-height:1" title="Clear selection">✕</button>
+            ` : `
+                <span style="color:#94a3b8;font-size:11px;font-weight:700;padding:0 4px">Login to flag text</span>
+                <button onclick="window.clearConstitutionSelection()" style="background:transparent;color:#94a3b8;border:none;border-radius:10px;padding:5px 8px;font-size:13px;font-weight:900;cursor:pointer;line-height:1" title="Clear selection">✕</button>
+            `;
+            const popupW = 180;
+            const top = rect.top + window.scrollY - popup.offsetHeight - 10;
+            const left = Math.max(8, Math.min(rect.left + rect.width / 2 - popupW / 2, window.innerWidth - popupW - 8));
+            popup.style.top = `${top}px`;
+            popup.style.left = `${left}px`;
+            popup.style.display = 'flex';
+            // Reposition after render so offsetHeight is accurate
+            requestAnimationFrame(() => {
+                const h = popup.offsetHeight;
+                popup.style.top = `${rect.top + window.scrollY - h - 10}px`;
+            });
+        }
+
+        window.clearConstitutionSelection = () => {
+            window.currentSelection = null;
+            window.getSelection()?.removeAllRanges();
+            const popup = document.getElementById('selection-popup');
+            if (popup) popup.style.display = 'none';
+            const summaryEl = document.getElementById('constitution-selection-summary');
+            if (summaryEl) summaryEl.textContent = 'Highlight text below to select';
+        };
+
         document.addEventListener('mouseup', () => {
             try {
                 const selection = window.getSelection();
                 const text = selection.toString().trim();
                 const isDiffModeActive = window.state?.constitutionCompareVersion !== null;
 
-                // Only capture selections when not in diff mode
                 if (text.length > 3 && !isDiffModeActive) {
                     // Ensure the selection occurred inside the rendered constitution
                     let node = selection.anchorNode;
@@ -65,50 +104,47 @@ export function renderConstitution(state) {
                         if (el.id === 'constitution-content') { insideConstitution = true; break; }
                         node = el.parentElement;
                     }
-
                     if (!insideConstitution) return;
 
-                    // Determine a reasonable section/context id for the selection
+                    // Determine section context
                     node = selection.anchorNode;
                     let contextId = 'General';
                     while (node && node !== document.body) {
                         const target = node.nodeType === 1 ? node : node.parentElement;
-                        if (target && target.id) {
-                            contextId = target.id;
-                            break;
-                        }
+                        if (target && target.id) { contextId = target.id; break; }
                         let sib = target?.previousElementSibling;
                         while (sib) {
-                            if (sib.id) {
-                                contextId = sib.id;
-                                break;
-                            }
+                            if (sib.id) { contextId = sib.id; break; }
                             sib = sib.previousElementSibling;
                         }
                         if (contextId !== 'General') break;
                         node = target.parentElement;
                     }
-
                     const sectionId = contextId.split('-')
-                        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                        .join(' ');
+                        .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
-                    // Store in window for buttons to access
                     window.currentSelection = { text, sectionId };
 
-                    // Update the sidebar UI if present
-                    try {
-                        const summaryEl = document.getElementById('constitution-selection-summary');
-                        if (summaryEl) {
-                            summaryEl.textContent = `${text.length} chars selected`;
-                        }
-                    } catch (e) {
-                        // ignore
-                    }
+                    // Update sidebar summary if present
+                    const summaryEl = document.getElementById('constitution-selection-summary');
+                    if (summaryEl) summaryEl.textContent = `${text.length} chars selected`;
+
+                    // Show floating popup above selection
+                    const range = selection.getRangeAt(0);
+                    showSelectionPopup(range.getBoundingClientRect());
+                } else {
+                    // Hide popup when no valid selection
+                    const popup = document.getElementById('selection-popup');
+                    if (popup) popup.style.display = 'none';
                 }
             } catch (e) {
                 console.warn('Selection handler error:', e);
             }
+        });
+
+        // Hide popup on Escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') window.clearConstitutionSelection?.();
         });
     }
 
@@ -148,6 +184,40 @@ export function renderConstitution(state) {
             <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
                 <!-- Sidebar -->
                 <aside class="lg:col-span-1 space-y-6 sticky top-8 h-fit">
+                    ${!isDiffMode ? `
+                    <!-- Action Panel: pinned to top of sidebar -->
+                    <div class="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+                        <h3 class="text-xs font-black uppercase tracking-[0.2em] text-slate-400 mb-3">Propose a Change</h3>
+                        ${state.ghToken ? `
+                        <p id="constitution-selection-summary" class="text-xs text-slate-500 dark:text-slate-400 mb-3">${window.currentSelection?.text ? `${window.currentSelection.text.length} chars selected` : 'Highlight text in the constitution to select it'}</p>
+                        <button onclick="window.addTextToCAP()"
+                            class="w-full px-4 py-2 rounded-xl bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 font-bold text-sm mb-2 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-all">
+                            <i data-lucide="plus" class="w-4 h-4 inline-block mr-2"></i>Add to CAP
+                        </button>
+                        <button onclick="window.addTextToCIS()"
+                            class="w-full px-4 py-2 rounded-xl bg-purple-50 dark:bg-purple-900/10 text-purple-600 dark:text-purple-400 font-bold text-sm mb-2 hover:bg-purple-100 dark:hover:bg-purple-900/20 transition-all">
+                            <i data-lucide="plus" class="w-4 h-4 inline-block mr-2"></i>Add to CIS
+                        </button>
+                        <button onclick="window.clearConstitutionSelection()"
+                            class="w-full px-4 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold text-sm hover:bg-slate-100 dark:hover:bg-slate-700 transition-all">
+                            <i data-lucide="x" class="w-4 h-4 inline-block mr-2"></i>Clear Selection
+                        </button>
+                        ${wizardInProgress ? `
+                        <button onclick="window.returnToWizard()"
+                            class="w-full mt-2 px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-all">
+                            <i data-lucide="arrow-left" class="w-4 h-4 inline-block mr-2"></i>Return to Wizard
+                        </button>
+                        ` : ''}
+                        ` : `
+                        <p class="text-xs text-slate-400 mb-4">Login to select text and create proposals from the constitution.</p>
+                        <button onclick="window.loginWithGitHub()"
+                            class="w-full px-4 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-xs flex items-center justify-center gap-2 hover:scale-105 transition-all">
+                            <i data-lucide="github" class="w-4 h-4"></i> Login with GitHub
+                        </button>
+                        `}
+                    </div>
+                    ` : ''}
+
                     <!-- Version Selector -->
                     <div class="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm">
                         <h3 class="text-xs font-black uppercase tracking-[0.2em] text-slate-400 mb-4">Version</h3>
@@ -207,38 +277,6 @@ export function renderConstitution(state) {
                         </div>
                     </div>
 
-                    ${!isDiffMode ? `
-                    <!-- Action Panel: text selection for creating proposals -->
-                    <div class="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm">
-                        <h3 class="text-xs font-black uppercase tracking-[0.2em] text-slate-400 mb-3">Text Selection</h3>
-                        ${state.ghToken ? `
-                        <p id="constitution-selection-summary" class="text-xs text-slate-500 dark:text-slate-400 mb-4">${window.currentSelection && window.currentSelection.text ? `${window.currentSelection.text.length} chars selected` : 'Highlight text below to select'}</p>
-                        <button onclick="window.addTextToCAP()"
-                            class="w-full px-4 py-2 rounded-xl bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 font-bold text-sm mb-2 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-all">
-                            <i data-lucide="plus" class="w-4 h-4 inline-block mr-2"></i>
-                            Add to CAP
-                        </button>
-                        <button onclick="window.addTextToCIS()"
-                            class="w-full px-4 py-2 rounded-xl bg-purple-50 dark:bg-purple-900/10 text-purple-600 dark:text-purple-400 font-bold text-sm mb-2 hover:bg-purple-100 dark:hover:bg-purple-900/20 transition-all">
-                            <i data-lucide="plus" class="w-4 h-4 inline-block mr-2"></i>
-                            Add to CIS
-                        </button>
-                        ${wizardInProgress ? `
-                        <button onclick="window.returnToWizard()"
-                            class="w-full px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-all">
-                            <i data-lucide="arrow-left" class="w-4 h-4 inline-block mr-2"></i>
-                            Return to Wizard
-                        </button>
-                        ` : ''}
-                        ` : `
-                        <p class="text-xs text-slate-400 mb-4">Login to select text and create proposals from the constitution.</p>
-                        <button onclick="window.loginWithGitHub()"
-                            class="w-full px-4 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-xs flex items-center justify-center gap-2 hover:scale-105 transition-all">
-                            <i data-lucide="github" class="w-4 h-4"></i> Login with GitHub
-                        </button>
-                        `}
-                    </div>
-                    ` : ''}
 
                     ${isDiffMode ? `
                     <!-- Diff Legend -->

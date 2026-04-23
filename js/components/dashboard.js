@@ -6,10 +6,9 @@
 export function renderDashboard(state) {
     const s = state.stats;
     const cards = [
-        { label: 'Proposed', value: s.draft, icon: 'file-text', color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-900/20' },
-        { label: 'In Review', value: s.review, icon: 'eye', color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20' },
-        { label: 'Finalized', value: s.final, icon: 'check-circle', color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
-        { label: 'Total Docs', value: s.total, icon: 'database', color: 'text-slate-600', bg: 'bg-slate-100 dark:bg-slate-800' }
+        { label: 'In Consultation', value: s.consultation, icon: 'message-circle', color: 'text-purple-600', bg: 'bg-purple-50 dark:bg-purple-900/20', onclick: `state.statusFilter='open'; state.docTypeFilter='ALL'; window.setView('list');` },
+        { label: 'Ready', value: s.ready, icon: 'check-circle', color: 'text-green-600', bg: 'bg-green-50 dark:bg-green-900/20', onclick: `state.statusFilter='open'; state.docTypeFilter='ALL'; window.setView('list');` },
+        { label: 'Done', value: s.done, icon: 'award', color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-900/20', onclick: `state.statusFilter='closed'; state.docTypeFilter='ALL'; window.setView('list');` },
     ];
 
     // Get active deliberations (open CAPs/CIS with deliberation period)
@@ -65,9 +64,9 @@ export function renderDashboard(state) {
             </header>
 
             <!-- Stats Grid -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
                 ${cards.map(c => `
-                    <div class="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm group hover:border-blue-200 dark:hover:border-blue-900/30 transition-all cursor-pointer">
+                    <div onclick="${c.onclick}" class="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm group hover:border-blue-200 dark:hover:border-blue-900/30 transition-all cursor-pointer">
                         <div class="w-12 h-12 ${c.bg} ${c.color} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                             <i data-lucide="${c.icon}" class="w-6 h-6"></i>
                         </div>
