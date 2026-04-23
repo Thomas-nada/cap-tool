@@ -19,7 +19,7 @@ import {
     addLabel,
     removeLabel,
     fetchEditors
-} from './api.js?v=6';
+} from './api.js?v=7';
 
 // Import UI Components
 import { renderNav } from './components/nav.js?v=5';
@@ -818,7 +818,7 @@ function buildFrontmatter(type, number, title, category, authorLogin, coAuthors,
     fm += `${type}: ${number}\n`;
     fm += `Title: ${title}\n`;
     fm += `Category: ${category}\n`;
-    fm += `Status: ${type === 'CAP' ? 'Draft' : 'Proposed'}\n`;
+    fm += `Status: Consultation\n`;
     fm += `Authors:\n    - @${authorLogin}\n`;
     if (coAuthors && coAuthors.length > 0) {
         fm += `Co-Authors:\n`;

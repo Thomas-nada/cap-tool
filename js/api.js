@@ -476,7 +476,7 @@ export async function fetchProposalEvents(number, token) {
  * Creates a new GitHub issue with appropriate labels.
  */
 export async function createGhIssue(title, body, category, type, token) {
-    let labels = type === 'CIS' ? ["CIS", "Proposed", "Deliberation-Period"] : ["CAP", "Draft"];
+    let labels = type === 'CIS' ? ["CIS", "consultation"] : ["CAP", "consultation"];
     if (category) labels.push(category);
 
     return await ghFetch(`/repos/${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}/issues`, token, {
