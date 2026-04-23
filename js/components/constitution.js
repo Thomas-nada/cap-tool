@@ -43,15 +43,20 @@ export function renderConstitution(state) {
     const wizardInProgress = localStorage.getItem('wizard_in_progress');
 
     // --- Text Selection System ---
-    // Initialize selection handler once globally. Shows a floating popup
-    // near the selected text with Add to CAP / Add to CIS / Clear buttons.
+    // Flow: highlight → popup appears → click + CAP or + CIS → coloured pill
+    // appears at top of the constitution. X on a pill removes it.
     if (!window.selectionHandlerInitialized) {
         window.selectionHandlerInitialized = true;
 
-        // Staged selections — array of { id, text, sectionId }
+        // Committed pills — array of { id, text, sectionId, type }
         window.stagedSelections = window.stagedSelections || [];
 
-        // Re-render the selection bar above the constitution article
+        const PILL_COLORS = {
+            CAP: { bg: '#2563eb', hover: '#1d4ed8' },
+            CIS: { bg: '#7c3aed', hover: '#6d28d9' }
+        };
+
+        // Re-render the pill bar above the constitution article
         function renderSelectionBar() {
             const col = document.getElementById('constitution-col');
             if (!col) return;
@@ -65,39 +70,38 @@ export function renderConstitution(state) {
                 bar.id = 'selection-bar';
                 col.insertBefore(bar, col.firstChild);
             }
-            bar.style.cssText = 'margin-bottom:16px;padding:12px 16px;background:#1e293b;border-radius:20px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;';
-            bar.innerHTML =
-                `<span style="color:#64748b;font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;flex-shrink:0">Selected</span>` +
-                window.stagedSelections.map(s => {
-                    const preview = s.text.length > 60 ? s.text.slice(0, 57).trimEnd() + '…' : s.text;
-                    return `<span style="display:inline-flex;align-items:center;gap:6px;background:#0f172a;border:1px solid #334155;border-radius:10px;padding:4px 10px;max-width:100%;">
-                        <span style="color:#93c5fd;font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px" title="${s.text.replace(/"/g,"&quot;")}">"${preview}"</span>
-                        <button onclick="window.removeSelection('${s.id}')" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:13px;font-weight:900;padding:0;line-height:1;flex-shrink:0" title="Remove">✕</button>
-                    </span>`;
-                }).join('') +
-                `<span style="color:#334155;font-size:10px;font-weight:700;margin-left:auto;flex-shrink:0">${window.stagedSelections.length} selection${window.stagedSelections.length > 1 ? 's' : ''}</span>`;
+            bar.style.cssText = 'margin-bottom:16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;';
+            bar.innerHTML = window.stagedSelections.map(s => {
+                const bg = PILL_COLORS[s.type]?.bg || '#2563eb';
+                const preview = s.text.length > 55 ? s.text.slice(0, 52).trimEnd() + '…' : s.text;
+                return `<span style="display:inline-flex;align-items:center;gap:8px;background:${bg};border-radius:999px;padding:6px 14px;max-width:100%;">
+                    <span style="color:#fff;font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0;opacity:.75">${s.type}</span>
+                    <span style="color:#fff;font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px" title="${s.text.replace(/"/g,'&quot;')}">${preview}</span>
+                    <button onclick="window.removeSelection('${s.id}')" style="background:rgba(255,255,255,0.2);border:none;color:#fff;cursor:pointer;font-size:11px;font-weight:900;padding:1px 5px;line-height:1;border-radius:999px;flex-shrink:0" title="Remove">✕</button>
+                </span>`;
+            }).join('');
         }
 
-        // Show floating popup above highlighted text
+        // Show the floating popup above the highlighted text
         function showSelectionPopup(rect) {
             let popup = document.getElementById('selection-popup');
             if (!popup) {
                 popup = document.createElement('div');
                 popup.id = 'selection-popup';
-                popup.style.cssText = 'position:fixed;z-index:9999;display:flex;align-items:center;gap:6px;background:#1e293b;border-radius:14px;padding:6px 10px;box-shadow:0 8px 32px rgba(0,0,0,0.3);pointer-events:auto;';
+                popup.style.cssText = 'position:fixed;z-index:9999;display:flex;align-items:center;gap:6px;background:#1e293b;border-radius:14px;padding:6px 10px;box-shadow:0 8px 32px rgba(0,0,0,0.35);pointer-events:auto;';
                 document.body.appendChild(popup);
             }
             const isLoggedIn = !!window.state?.ghToken;
             popup.innerHTML = isLoggedIn
-                ? `<button onclick="window.addTextToCAP()" style="background:#2563eb;color:#fff;border:none;border-radius:10px;padding:5px 12px;font-size:11px;font-weight:800;cursor:pointer;letter-spacing:.05em;white-space:nowrap">+ CAP</button>
-                   <button onclick="window.addTextToCIS()" style="background:#7c3aed;color:#fff;border:none;border-radius:10px;padding:5px 12px;font-size:11px;font-weight:800;cursor:pointer;letter-spacing:.05em;white-space:nowrap">+ CIS</button>`
+                ? `<button onclick="window.commitSelection('CAP')" style="background:#2563eb;color:#fff;border:none;border-radius:10px;padding:5px 13px;font-size:11px;font-weight:800;cursor:pointer;letter-spacing:.05em;white-space:nowrap">+ CAP</button>
+                   <button onclick="window.commitSelection('CIS')" style="background:#7c3aed;color:#fff;border:none;border-radius:10px;padding:5px 13px;font-size:11px;font-weight:800;cursor:pointer;letter-spacing:.05em;white-space:nowrap">+ CIS</button>`
                 : `<span style="color:#94a3b8;font-size:11px;font-weight:700;padding:0 4px">Login to flag text</span>`;
-            const popupW = 160;
             popup.style.top = '-9999px';
             popup.style.left = '-9999px';
             popup.style.display = 'flex';
             requestAnimationFrame(() => {
                 const h = popup.offsetHeight;
+                const popupW = popup.offsetWidth;
                 const top = rect.top + window.scrollY - h - 10;
                 const left = Math.max(8, Math.min(rect.left + rect.width / 2 - popupW / 2, window.innerWidth - popupW - 8));
                 popup.style.top = `${top}px`;
@@ -105,34 +109,43 @@ export function renderConstitution(state) {
             });
         }
 
-        // Remove a single staged selection by id
-        window.removeSelection = (id) => {
-            window.stagedSelections = (window.stagedSelections || []).filter(s => s.id !== id);
-            // If the removed selection was the current one, clear it
-            if (window.currentSelection?.id === id) {
-                window.currentSelection = null;
-                window.getSelection()?.removeAllRanges();
-                const popup = document.getElementById('selection-popup');
-                if (popup) popup.style.display = 'none';
+        function hidePopup() {
+            const popup = document.getElementById('selection-popup');
+            if (popup) popup.style.display = 'none';
+        }
+
+        // Called when user clicks + CAP or + CIS in the popup
+        window.commitSelection = (type) => {
+            if (!window.currentSelection?.text) return;
+            const { text, sectionId } = window.currentSelection;
+            // Avoid exact-text duplicates of same type
+            if (!window.stagedSelections.some(s => s.text === text && s.type === type)) {
+                window.stagedSelections.push({ id: `sel-${Date.now()}`, text, sectionId, type });
             }
-            // Keep currentSelection pointing to last staged item if any
-            if (!window.currentSelection && window.stagedSelections.length) {
-                window.currentSelection = window.stagedSelections[window.stagedSelections.length - 1];
-            }
+            // Pass to existing proposal machinery
+            if (type === 'CAP') window.addTextToCAP?.();
+            else window.addTextToCIS?.();
+            // Clear the live selection & popup
+            window.currentSelection = null;
+            window.getSelection()?.removeAllRanges();
+            hidePopup();
             renderSelectionBar();
             const summaryEl = document.getElementById('constitution-selection-summary');
-            if (summaryEl) summaryEl.textContent = window.currentSelection
-                ? `${window.currentSelection.text.length} chars selected`
-                : 'Highlight text in the constitution to select it';
+            if (summaryEl) summaryEl.textContent = 'Highlight text in the constitution to select it';
         };
 
-        // Clear everything
+        // Remove a single pill by id
+        window.removeSelection = (id) => {
+            window.stagedSelections = window.stagedSelections.filter(s => s.id !== id);
+            renderSelectionBar();
+        };
+
+        // Clear everything — pills, live selection, popup
         window.clearConstitutionSelection = () => {
             window.currentSelection = null;
             window.stagedSelections = [];
             window.getSelection()?.removeAllRanges();
-            const popup = document.getElementById('selection-popup');
-            if (popup) popup.style.display = 'none';
+            hidePopup();
             renderSelectionBar();
             const summaryEl = document.getElementById('constitution-selection-summary');
             if (summaryEl) summaryEl.textContent = 'Highlight text in the constitution to select it';
@@ -145,62 +158,46 @@ export function renderConstitution(state) {
                 const isDiffModeActive = window.state?.constitutionCompareVersion !== null;
 
                 if (text.length > 3 && !isDiffModeActive) {
-                    // Ensure selection is inside the constitution article
+                    // Only react to selections inside the constitution article
                     let node = selection.anchorNode;
-                    let insideConstitution = false;
+                    let inside = false;
                     while (node && node !== document.body) {
                         const el = node.nodeType === 1 ? node : node.parentElement;
                         if (!el) break;
-                        if (el.id === 'constitution-content') { insideConstitution = true; break; }
+                        if (el.id === 'constitution-content') { inside = true; break; }
                         node = el.parentElement;
                     }
-                    if (!insideConstitution) return;
+                    if (!inside) return;
 
                     // Determine section context
                     node = selection.anchorNode;
                     let contextId = 'General';
                     while (node && node !== document.body) {
                         const target = node.nodeType === 1 ? node : node.parentElement;
-                        if (target && target.id) { contextId = target.id; break; }
+                        if (target?.id) { contextId = target.id; break; }
                         let sib = target?.previousElementSibling;
-                        while (sib) {
-                            if (sib.id) { contextId = sib.id; break; }
-                            sib = sib.previousElementSibling;
-                        }
+                        while (sib) { if (sib.id) { contextId = sib.id; break; } sib = sib.previousElementSibling; }
                         if (contextId !== 'General') break;
-                        node = target.parentElement;
+                        node = target?.parentElement;
                     }
-                    const sectionId = contextId.split('-')
-                        .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                    const sectionId = contextId.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
-                    // Stage the selection
-                    const id = `sel-${Date.now()}`;
-                    const sel = { id, text, sectionId };
-                    window.currentSelection = sel;
-                    // Add to staged list (avoid exact-text duplicates)
-                    if (!window.stagedSelections.some(s => s.text === text)) {
-                        window.stagedSelections.push(sel);
-                    }
+                    // Store as pending selection (no pill yet — pill appears on button click)
+                    window.currentSelection = { text, sectionId };
 
-                    // Update sidebar summary
                     const summaryEl = document.getElementById('constitution-selection-summary');
                     if (summaryEl) summaryEl.textContent = `${text.length} chars selected`;
 
-                    // Update bar and popup
-                    renderSelectionBar();
-                    const range = selection.getRangeAt(0);
-                    showSelectionPopup(range.getBoundingClientRect());
+                    showSelectionPopup(selection.getRangeAt(0).getBoundingClientRect());
                 } else {
-                    const popup = document.getElementById('selection-popup');
-                    if (popup) popup.style.display = 'none';
+                    hidePopup();
                 }
             } catch (e) {
                 console.warn('Selection handler error:', e);
             }
         });
 
-        // ESC clears everything
-        document.addEventListener('keydown', (e) => {
+        document.addEventListener('keydown', e => {
             if (e.key === 'Escape') window.clearConstitutionSelection?.();
         });
     }
