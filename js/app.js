@@ -353,7 +353,8 @@ window.state = {
     constitutionCurrentVersion: null,
     constitutionCompareVersion: null,
     selectedReferences: [],
-    expandedEventId: null, 
+    expandedEventId: null,
+    auditTrailExpanded: false,
     theme: localStorage.getItem('theme') || 'light',
     draft: {
         title: '', category: '', abstract: '', motivation: '', analysis: '', impact: '', exhibits: '', files: [], revisions: {}, coAuthors: []
@@ -463,6 +464,7 @@ window.applyMarkdown = (textareaId, type) => {
 window.handleRouting = async () => {
     const hash = window.location.hash || '#/home';
     state.expandedEventId = null;
+    state.auditTrailExpanded = false;
     state.error = null;
 
     if (hash === '#/home' || hash === '#/') {

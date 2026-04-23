@@ -37,6 +37,14 @@ export function renderDetail(state) {
     };
 
     /**
+     * Toggles between showing 5 most recent audit trail items and the full list.
+     */
+    window.toggleAuditTrail = () => {
+        state.auditTrailExpanded = !state.auditTrailExpanded;
+        if (window.updateUI) window.updateUI(true);
+    };
+
+    /**
      * Manages the high-frequency UI updates for the deliberation clock.
      */
     if (window.detailTimerInterval) clearInterval(window.detailTimerInterval);
@@ -216,72 +224,90 @@ export function renderDetail(state) {
                             </div>
                         </div>
 
-                        <div class="space-y-6 relative">
-                            <!-- Timeline connector line -->
-                            <div class="absolute left-[13px] top-2 bottom-2 w-[2px] bg-slate-100 dark:bg-slate-800"></div>
-                            
-                            ${state.proposalEvents.slice(0, 25).map(event => {
-                                const details = getEventDetails(event);
-                                const isExpanded = state.expandedEventId == event.id;
-                                const isBot = event.actor?.login?.includes('bot') || event.actor?.login?.includes('actions');
+                        ${(() => {
+                            const AUDIT_LIMIT = 5;
+                            const allEvents = state.proposalEvents || [];
+                            const isExpanded = state.auditTrailExpanded;
+                            const visibleEvents = isExpanded ? allEvents : allEvents.slice(0, AUDIT_LIMIT);
+                            const hasMore = allEvents.length > AUDIT_LIMIT;
 
-                                return `
-                                    <div class="flex gap-5 relative z-10">
-                                        <!-- Actor Avatar -->
-                                        <div class="relative cursor-pointer transition-transform hover:scale-110" onclick="window.toggleEventExpansion('${event.id}')">
-                                            <img src="${event.actor?.avatar_url || 'https://github.com/identicons/jasonlong.png'}" 
-                                                 class="w-7 h-7 rounded-lg border-2 border-white dark:border-slate-900 shadow-sm relative z-20">
-                                            <div class="absolute -right-1.5 -bottom-1.5 w-4 h-4 rounded-full bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 flex items-center justify-center z-30 shadow-sm">
-                                                <i data-lucide="${details.icon}" class="w-2 h-2 ${details.color}"></i>
-                                            </div>
-                                        </div>
+                            return `
+                            <div class="space-y-6 relative">
+                                <!-- Timeline connector line -->
+                                <div class="absolute left-[13px] top-2 bottom-2 w-[2px] bg-slate-100 dark:bg-slate-800"></div>
 
-                                        <!-- Event Body -->
-                                        <div class="flex-grow pt-0.5">
-                                            <div class="flex items-center justify-between mb-1 cursor-pointer" onclick="window.toggleEventExpansion('${event.id}')">
-                                                <p class="text-[10px] font-black ${isBot ? 'text-blue-600' : 'text-slate-900 dark:text-white'} uppercase leading-none">
-                                                    ${event.actor?.login || 'Governance Bot'}
-                                                </p>
-                                                <span class="text-[8px] text-slate-400 font-bold uppercase tracking-tighter">
-                                                    ${new Date(event.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                </span>
+                                ${visibleEvents.map(event => {
+                                    const details = getEventDetails(event);
+                                    const isEventExpanded = state.expandedEventId == event.id;
+                                    const isBot = event.actor?.login?.includes('bot') || event.actor?.login?.includes('actions');
+
+                                    return `
+                                        <div class="flex gap-5 relative z-10">
+                                            <!-- Actor Avatar -->
+                                            <div class="relative cursor-pointer transition-transform hover:scale-110" onclick="window.toggleEventExpansion('${event.id}')">
+                                                <img src="${event.actor?.avatar_url || 'https://github.com/identicons/jasonlong.png'}"
+                                                     class="w-7 h-7 rounded-lg border-2 border-white dark:border-slate-900 shadow-sm relative z-20">
+                                                <div class="absolute -right-1.5 -bottom-1.5 w-4 h-4 rounded-full bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 flex items-center justify-center z-30 shadow-sm">
+                                                    <i data-lucide="${details.icon}" class="w-2 h-2 ${details.color}"></i>
+                                                </div>
                                             </div>
-                                            
-                                            <div class="text-[10px] text-slate-500 font-medium leading-relaxed bg-slate-50/50 dark:bg-slate-950/50 p-4 rounded-2xl border transition-all cursor-pointer hover:bg-slate-100/50 dark:hover:bg-slate-800/50 ${isExpanded ? 'border-blue-300 bg-blue-50/20 dark:border-blue-900/40 shadow-inner' : 'border-slate-100/50 dark:border-slate-800/50'}" 
-                                                 onclick="window.toggleEventExpansion('${event.id}')">
-                                                
-                                                <span class="${isExpanded ? 'font-bold text-slate-900 dark:text-white' : ''}">
-                                                    ${details.message}
-                                                </span>
-                                                
-                                                ${isExpanded ? `
-                                                    <div class="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800 space-y-4 animate-in fade-in slide-in-from-top-1">
-                                                        <div class="space-y-3">
-                                                            <span class="text-[8px] font-black uppercase text-slate-400 tracking-[0.2em]">Details</span>
-                                                            <div class="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800 prose dark:prose-invert prose-sm max-w-none text-[11px] leading-relaxed break-words shadow-sm">
-                                                                ${window.marked.parse(details.fullDescription || details.message)}
+
+                                            <!-- Event Body -->
+                                            <div class="flex-grow pt-0.5">
+                                                <div class="flex items-center justify-between mb-1 cursor-pointer" onclick="window.toggleEventExpansion('${event.id}')">
+                                                    <p class="text-[10px] font-black ${isBot ? 'text-blue-600' : 'text-slate-900 dark:text-white'} uppercase leading-none">
+                                                        ${event.actor?.login || 'Governance Bot'}
+                                                    </p>
+                                                    <span class="text-[8px] text-slate-400 font-bold uppercase tracking-tighter">
+                                                        ${new Date(event.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                </div>
+
+                                                <div class="text-[10px] text-slate-500 font-medium leading-relaxed bg-slate-50/50 dark:bg-slate-950/50 p-4 rounded-2xl border transition-all cursor-pointer hover:bg-slate-100/50 dark:hover:bg-slate-800/50 ${isEventExpanded ? 'border-blue-300 bg-blue-50/20 dark:border-blue-900/40 shadow-inner' : 'border-slate-100/50 dark:border-slate-800/50'}"
+                                                     onclick="window.toggleEventExpansion('${event.id}')">
+
+                                                    <span class="${isEventExpanded ? 'font-bold text-slate-900 dark:text-white' : ''}">
+                                                        ${details.message}
+                                                    </span>
+
+                                                    ${isEventExpanded ? `
+                                                        <div class="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800 space-y-4 animate-in fade-in slide-in-from-top-1">
+                                                            <div class="space-y-3">
+                                                                <span class="text-[8px] font-black uppercase text-slate-400 tracking-[0.2em]">Details</span>
+                                                                <div class="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800 prose dark:prose-invert prose-sm max-w-none text-[11px] leading-relaxed break-words shadow-sm">
+                                                                    ${window.marked.parse(details.fullDescription || details.message)}
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="flex items-center justify-between pt-2">
+                                                                <div class="flex flex-col">
+                                                                    <span class="text-[7px] font-black uppercase text-slate-400">TX Signature</span>
+                                                                    <span class="text-[8px] font-mono text-blue-600 uppercase tracking-tighter">
+                                                                        EVT-${event.id.toString().substring(0, 12)}
+                                                                    </span>
+                                                                </div>
+                                                                <a href="${details.extUrl || event.html_url}" target="_blank" class="px-4 py-2 bg-slate-950 dark:bg-white text-white dark:text-slate-950 rounded-lg text-[8px] font-black uppercase tracking-widest hover:opacity-80 transition-opacity flex items-center gap-2">
+                                                                    <i data-lucide="external-link" class="w-2.5 h-2.5"></i> Verification
+                                                                </a>
                                                             </div>
                                                         </div>
-                                                        
-                                                        <div class="flex items-center justify-between pt-2">
-                                                            <div class="flex flex-col">
-                                                                <span class="text-[7px] font-black uppercase text-slate-400">TX Signature</span>
-                                                                <span class="text-[8px] font-mono text-blue-600 uppercase tracking-tighter">
-                                                                    EVT-${event.id.toString().substring(0, 12)}
-                                                                </span>
-                                                            </div>
-                                                            <a href="${details.extUrl || event.html_url}" target="_blank" class="px-4 py-2 bg-slate-950 dark:bg-white text-white dark:text-slate-950 rounded-lg text-[8px] font-black uppercase tracking-widest hover:opacity-80 transition-opacity flex items-center gap-2">
-                                                                <i data-lucide="external-link" class="w-2.5 h-2.5"></i> Verification
-                                                            </a>
-                                                        </div>
-                                                    </div>
-                                                ` : ''}
+                                                    ` : ''}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                `;
-                            }).join('')}
-                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+
+                            ${hasMore ? `
+                            <button onclick="window.toggleAuditTrail()"
+                                class="mt-6 w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all">
+                                <i data-lucide="${isExpanded ? 'chevron-up' : 'chevron-down'}" class="w-3.5 h-3.5"></i>
+                                ${isExpanded ? 'Show less' : `Show all ${allEvents.length} events`}
+                            </button>
+                            ` : ''}
+                            `;
+                        })()}
                     </div>
 
                     <!-- Author Administration Card -->
