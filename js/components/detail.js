@@ -125,8 +125,15 @@ export function renderDetail(state) {
                     <!-- Comments and Discussion -->
                     <section class="space-y-12 pt-16 border-t border-slate-100 dark:border-slate-800">
                         ${(() => {
-                            const AUDIT_MARKER = '<!-- PORTAL:EDIT_AUDIT -->';
-                            const discussionComments = state.comments.filter(c => !c.body.includes(AUDIT_MARKER));
+                            const SYSTEM_PREFIXES = [
+                                '<!-- PORTAL:EDIT_AUDIT -->',
+                                '<!-- PORTAL:EDIT_SUGGESTION -->',
+                                '<!-- PORTAL:EDIT_SUGGESTION:APPLIED -->',
+                                '<!-- PORTAL:EDIT_SUGGESTION:DISMISSED -->',
+                            ];
+                            const discussionComments = state.comments.filter(c =>
+                                !SYSTEM_PREFIXES.some(p => c.body.includes(p))
+                            );
                             return `
                         <div class="flex items-center justify-between px-4">
                             <h2 class="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Discussion</h2>
@@ -231,18 +238,28 @@ export function renderDetail(state) {
 
                         ${(() => {
                             const AUDIT_LIMIT = 5;
-                            const AUDIT_MARKER = '<!-- PORTAL:EDIT_AUDIT -->';
-                            // Merge edit audit comments into the events list as synthetic events
-                            const editAuditItems = (state.comments || [])
-                                .filter(c => c.body.includes(AUDIT_MARKER))
-                                .map(c => ({
-                                    id: `edit-${c.id}`,
-                                    event: 'portal_edit',
-                                    actor: c.user,
-                                    created_at: c.created_at,
-                                    _editBody: c.body.replace(AUDIT_MARKER, '').trim()
-                                }));
-                            const allEvents = [...(state.proposalEvents || []), ...editAuditItems]
+                            const AUDIT_MARKER      = '<!-- PORTAL:EDIT_AUDIT -->';
+                            const SUGGESTION_MARKER = '<!-- PORTAL:EDIT_SUGGESTION -->';
+                            const APPLIED_MARKER    = '<!-- PORTAL:EDIT_SUGGESTION:APPLIED -->';
+                            const DISMISSED_MARKER  = '<!-- PORTAL:EDIT_SUGGESTION:DISMISSED -->';
+                            const SYSTEM_MARKERS    = [AUDIT_MARKER, SUGGESTION_MARKER, APPLIED_MARKER, DISMISSED_MARKER];
+
+                            const systemComments = (state.comments || []).filter(c =>
+                                SYSTEM_MARKERS.some(m => c.body.includes(m))
+                            );
+                            const syntheticEvents = systemComments.map(c => {
+                                if (c.body.includes(AUDIT_MARKER))
+                                    return { id: `audit-${c.id}`, event: 'portal_edit',               actor: c.user, created_at: c.created_at, _editBody: c.body.replace(AUDIT_MARKER, '').trim() };
+                                if (c.body.includes(APPLIED_MARKER))
+                                    return { id: `applied-${c.id}`, event: 'portal_suggestion_applied',   actor: c.user, created_at: c.created_at };
+                                if (c.body.includes(DISMISSED_MARKER))
+                                    return { id: `dismissed-${c.id}`, event: 'portal_suggestion_dismissed', actor: c.user, created_at: c.created_at };
+                                if (c.body.includes(SUGGESTION_MARKER))
+                                    return { id: `sug-${c.id}`, event: 'portal_suggestion',             actor: c.user, created_at: c.created_at };
+                                return null;
+                            }).filter(Boolean);
+
+                            const allEvents = [...(state.proposalEvents || []), ...syntheticEvents]
                                 .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
                             const isExpanded = state.auditTrailExpanded;
                             const visibleEvents = isExpanded ? allEvents : allEvents.slice(0, AUDIT_LIMIT);
@@ -382,6 +399,57 @@ export function renderDetail(state) {
                                     <i data-lucide="chevron-right" class="w-4 h-4 ${authorReadyNow ? 'text-green-200' : 'text-green-300'} group-hover:translate-x-1 transition-transform"></i>
                                 </button>
                                 ` : ''}
+
+                                ${(() => {
+                                    // Find the active (unresolved) editor suggestion
+                                    const SMRK  = '<!-- PORTAL:EDIT_SUGGESTION -->';
+                                    const APMRK = '<!-- PORTAL:EDIT_SUGGESTION:APPLIED -->';
+                                    const DSMRK = '<!-- PORTAL:EDIT_SUGGESTION:DISMISSED -->';
+                                    const allC  = state.comments || [];
+                                    const suggestions  = allC.filter(c => c.body.includes(SMRK));
+                                    const resolutions  = allC.filter(c => c.body.includes(APMRK) || c.body.includes(DSMRK));
+                                    const latestSug    = suggestions[suggestions.length - 1];
+                                    const latestRes    = resolutions[resolutions.length - 1];
+                                    const activeSug    = latestSug && (!latestRes || new Date(latestSug.created_at) > new Date(latestRes.created_at)) ? latestSug : null;
+
+                                    if (!activeSug) return '';
+
+                                    const rawBody      = activeSug.body.replace(SMRK, '').trim();
+                                    const sugMatch     = rawBody.match(/\*\*Suggestion:\*\*\n([\s\S]*?)(?=\n\n\*\*Reason:|$)/);
+                                    const reasonMatch  = rawBody.match(/\*\*Reason:\*\*\n([\s\S]*?)$/);
+                                    const suggestionText = sugMatch?.[1]?.trim() || rawBody;
+                                    const reason         = reasonMatch?.[1]?.trim() || '';
+                                    const editorLogin    = activeSug.user?.login || 'editor';
+                                    const suggDate       = new Date(activeSug.created_at).toLocaleDateString();
+                                    // Escape for inline onclick attribute
+                                    const escapedText  = suggestionText.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
+
+                                    return `
+                                    <div class="rounded-2xl border-2 border-violet-200 dark:border-violet-800/40 bg-violet-50 dark:bg-violet-900/10 p-5 space-y-4">
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex items-center gap-2 text-violet-700 dark:text-violet-400">
+                                                <i data-lucide="message-square-plus" class="w-3.5 h-3.5 flex-shrink-0"></i>
+                                                <span class="text-[10px] font-black uppercase tracking-wider">Editor Suggestion</span>
+                                            </div>
+                                            <span class="text-[9px] text-violet-400 font-bold">@${editorLogin} · ${suggDate}</span>
+                                        </div>
+                                        <div class="text-[11px] text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 rounded-xl p-4 border border-violet-100 dark:border-violet-900/30 leading-relaxed max-h-40 overflow-y-auto">
+                                            ${window.marked.parse(suggestionText)}
+                                        </div>
+                                        ${reason ? `<p class="text-[10px] text-violet-600 dark:text-violet-400 italic leading-relaxed">${reason}</p>` : ''}
+                                        <div class="flex gap-2">
+                                            <button onclick="window.applyEditorSuggestion('${escapedText}', ${activeSug.id})"
+                                                class="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-[9px] font-black uppercase tracking-wider transition-all">
+                                                <i data-lucide="check" class="w-3 h-3"></i> Apply Edit
+                                            </button>
+                                            <button onclick="window.dismissEditorSuggestion(${activeSug.id})"
+                                                class="px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 text-[9px] font-black uppercase tracking-wider hover:bg-slate-50 dark:hover:bg-slate-700 transition-all">
+                                                Dismiss
+                                            </button>
+                                        </div>
+                                    </div>
+                                    `;
+                                })()}
 
                                 ${isActive ? `
                                 <button onclick="window.startEdit()" class="w-full flex items-center justify-between p-5 rounded-2xl bg-blue-50 dark:bg-blue-900/10 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-all group">
@@ -566,6 +634,39 @@ export function renderDetail(state) {
                                     }).join('')}
                                 </div>
                             </div>
+
+                            <!-- Suggest Edit -->
+                            <div class="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                                <div class="flex items-center justify-between">
+                                    <p class="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Suggest Edit</p>
+                                    <button onclick="window.toggleSuggestionForm()"
+                                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${state.showSuggestionForm ? 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300' : 'bg-violet-50 dark:bg-violet-900/20 text-violet-600 hover:bg-violet-100 dark:hover:bg-violet-900/30'}">
+                                        <i data-lucide="${state.showSuggestionForm ? 'x' : 'plus'}" class="w-3 h-3"></i>
+                                        ${state.showSuggestionForm ? 'Cancel' : 'New'}
+                                    </button>
+                                </div>
+                                ${state.showSuggestionForm ? `
+                                <div class="space-y-3 p-4 bg-violet-50 dark:bg-violet-900/10 rounded-2xl border border-violet-100 dark:border-violet-900/30">
+                                    <div class="space-y-1.5">
+                                        <label class="text-[9px] font-black uppercase tracking-[0.15em] text-violet-600">Suggested change</label>
+                                        <textarea id="suggestion-text" rows="5" placeholder="Describe exactly what should be changed, or paste the revised text..."
+                                            class="w-full text-[11px] p-3 rounded-xl border border-violet-200 dark:border-violet-800/40 bg-white dark:bg-slate-900 text-slate-900 dark:text-white resize-none outline-none focus:ring-2 focus:ring-violet-400 leading-relaxed"></textarea>
+                                    </div>
+                                    <div class="space-y-1.5">
+                                        <label class="text-[9px] font-black uppercase tracking-[0.15em] text-violet-500">Reason <span class="font-normal text-violet-400">(optional)</span></label>
+                                        <textarea id="suggestion-reason" rows="2" placeholder="Why is this change needed?"
+                                            class="w-full text-[11px] p-3 rounded-xl border border-violet-200 dark:border-violet-800/40 bg-white dark:bg-slate-900 text-slate-900 dark:text-white resize-none outline-none focus:ring-2 focus:ring-violet-400 leading-relaxed"></textarea>
+                                    </div>
+                                    <button onclick="window.submitEditorSuggestion()"
+                                        class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-[10px] font-black uppercase tracking-widest transition-all">
+                                        <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                                        Post Suggestion
+                                    </button>
+                                </div>
+                                ` : `
+                                <p class="text-[10px] text-slate-400 italic">Send a suggested revision for the author to review and apply.</p>
+                                `}
+                            </div>
                         </div>`;
                     })() : ''}
                 </aside>
@@ -725,6 +826,27 @@ function getEventDetails(event) {
             details.color = 'text-blue-500';
             details.message = '✏️ Proposal Edited';
             details.fullDescription = event._editBody || `**${event.actor?.login || 'The author'}** edited this proposal.`;
+            break;
+
+        case 'portal_suggestion':
+            details.icon = 'message-square-plus';
+            details.color = 'text-violet-500';
+            details.message = `💡 Editor Suggested a Revision`;
+            details.fullDescription = `**@${event.actor?.login || 'An editor'}** submitted a suggested revision for the author to review.`;
+            break;
+
+        case 'portal_suggestion_applied':
+            details.icon = 'check-square';
+            details.color = 'text-green-600';
+            details.message = `✅ Editor Suggestion Applied`;
+            details.fullDescription = `**@${event.actor?.login || 'The author'}** accepted and applied the editor's suggested revision.`;
+            break;
+
+        case 'portal_suggestion_dismissed':
+            details.icon = 'x-square';
+            details.color = 'text-slate-400';
+            details.message = `❌ Editor Suggestion Dismissed`;
+            details.fullDescription = `**@${event.actor?.login || 'The author'}** reviewed and declined the editor's suggested revision.`;
             break;
     }
 

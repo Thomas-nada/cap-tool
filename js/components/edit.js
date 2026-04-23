@@ -101,6 +101,19 @@ export function renderEdit(state) {
                 <p class="text-slate-500 text-xl font-medium">Modifying <span class="text-blue-600 font-bold">${type} #${p.number}</span>.</p>
             </header>
 
+            ${state.activeSuggestionRef ? `
+            <div class="mb-10 p-6 rounded-[2rem] border-2 border-violet-200 dark:border-violet-800/40 bg-violet-50 dark:bg-violet-900/10 space-y-4">
+                <div class="flex items-center gap-2 text-violet-700 dark:text-violet-400">
+                    <i data-lucide="message-square-plus" class="w-4 h-4 flex-shrink-0"></i>
+                    <span class="text-xs font-black uppercase tracking-wider">Editor's Suggestion — Reference</span>
+                    <span class="ml-auto text-[10px] text-violet-400 font-bold">Apply the changes below using this as a guide</span>
+                </div>
+                <div class="text-sm text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 rounded-xl p-5 border border-violet-100 dark:border-violet-900/30 leading-relaxed prose dark:prose-invert max-w-none max-h-56 overflow-y-auto">
+                    ${window.marked ? window.marked.parse(state.activeSuggestionRef.text) : state.activeSuggestionRef.text}
+                </div>
+            </div>
+            ` : ''}
+
             <form onsubmit="window.handleEdit(event)" class="space-y-12">
                 
                 <!-- Section 1: Classification & Core Meta -->

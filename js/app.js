@@ -25,9 +25,9 @@ import {
 import { renderNav } from './components/nav.js?v=5';
 import { renderDashboard } from './components/dashboard.js?v=3';
 import { renderRegistry } from './components/registry.js?v=7';
-import { renderDetail } from './components/detail.js?v=10';
+import { renderDetail } from './components/detail.js?v=11';
 import { renderCreate } from './components/create.js?v=2';
-import { renderEdit } from './components/edit.js?v=2';
+import { renderEdit } from './components/edit.js?v=3';
 import { renderConstitution } from './components/constitution.js?v=13';
 import { renderWizard } from './components/wizard.js?v=2';
 import { renderLearnHub } from './components/learn.js?v=4';
@@ -355,6 +355,8 @@ window.state = {
     selectedReferences: [],
     expandedEventId: null,
     auditTrailExpanded: false,
+    showSuggestionForm: false,
+    activeSuggestionRef: null,
     theme: localStorage.getItem('theme') || 'light',
     draft: {
         title: '', category: '', abstract: '', motivation: '', analysis: '', impact: '', exhibits: '', files: [], revisions: {}, coAuthors: []
@@ -465,6 +467,8 @@ window.handleRouting = async () => {
     const hash = window.location.hash || '#/home';
     state.expandedEventId = null;
     state.auditTrailExpanded = false;
+    state.showSuggestionForm = false;
+    state.activeSuggestionRef = null;
     state.error = null;
 
     if (hash === '#/home' || hash === '#/') {
@@ -803,6 +807,22 @@ window.handleEdit = async (event) => {
             `<!-- PORTAL:EDIT_AUDIT -->\n✏️ **Proposal edited** by @${state.ghUser?.login || 'author'} — ${editTimestamp}`,
             state.ghToken
         ).catch(() => {}); // non-critical — silently ignore if audit comment fails
+
+        // If this edit was triggered by applying an editor suggestion, post the applied marker
+        if (state.activeSuggestionRef) {
+            const login = state.ghUser?.login || 'author';
+            postProposalComment(
+                p.number,
+                `<!-- PORTAL:EDIT_SUGGESTION:APPLIED -->\n✅ **Suggestion applied** by @${login} — ${editTimestamp}`,
+                state.ghToken
+            ).catch(() => {});
+            // Remove editor-suggested label if still set
+            const existing = p.labels.map(l => l.name);
+            if (existing.includes('editor-suggested')) {
+                removeLabel(p.number, 'editor-suggested', state.ghToken).catch(() => {});
+            }
+            state.activeSuggestionRef = null;
+        }
 
         state.editFiles = [];
         window.showToast('Updated', `${type} #${p.number} updated successfully.`, 'success');
@@ -1500,6 +1520,81 @@ window.editorToggleSpecial = async (label) => {
         }
         updateUI(true);
         window.showToast('Label Updated', isOn ? `Removed: ${label}` : `Added: ${label}`, 'success');
+    } catch (e) {
+        window.showToast('Error', e.message, 'error');
+    }
+};
+
+// --- Editor Suggestions ---
+
+const SUGGESTION_MARKER   = '<!-- PORTAL:EDIT_SUGGESTION -->';
+const SUGGESTION_APPLIED  = '<!-- PORTAL:EDIT_SUGGESTION:APPLIED -->';
+const SUGGESTION_DISMISSED = '<!-- PORTAL:EDIT_SUGGESTION:DISMISSED -->';
+
+window.toggleSuggestionForm = () => {
+    state.showSuggestionForm = !state.showSuggestionForm;
+    updateUI(true);
+};
+
+window.submitEditorSuggestion = async () => {
+    if (!state.isEditor || !state.currentProposal) return;
+    const textEl   = document.getElementById('suggestion-text');
+    const reasonEl = document.getElementById('suggestion-reason');
+    const text   = textEl?.value?.trim();
+    const reason = reasonEl?.value?.trim();
+    if (!text) { window.showToast('Required', 'Please enter your suggestion.', 'error'); return; }
+
+    const number = state.currentProposal.number;
+    const token  = state.ghToken;
+    const login  = state.ghUser?.login || 'editor';
+    const date   = new Date().toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+
+    const body = `${SUGGESTION_MARKER}\n**Editor @${login} suggested a revision** — ${date}\n\n**Suggestion:**\n${text}${reason ? `\n\n**Reason:**\n${reason}` : ''}`;
+
+    try {
+        await postProposalComment(number, body, token);
+        // Auto-apply editor-suggested label if not already set
+        const existing = state.currentProposal.labels.map(l => l.name);
+        if (!existing.includes('editor-suggested')) {
+            const updatedLabels = await addLabel(number, 'editor-suggested', token);
+            if (Array.isArray(updatedLabels)) {
+                state.currentProposal = { ...state.currentProposal, labels: updatedLabels };
+            }
+        }
+        state.showSuggestionForm = false;
+        state.comments = await fetchProposalComments(number, token);
+        updateUI(true);
+        window.showToast('Suggestion Posted', 'The author will see your suggestion.', 'success');
+    } catch (e) {
+        window.showToast('Error', e.message, 'error');
+    }
+};
+
+window.applyEditorSuggestion = (suggestionText, commentId) => {
+    // Store suggestion as a reference to be shown in the edit view
+    state.activeSuggestionRef = { text: suggestionText, commentId };
+    window.startEdit();
+};
+
+window.dismissEditorSuggestion = async (commentId) => {
+    if (!state.currentProposal) return;
+    const number = state.currentProposal.number;
+    const token  = state.ghToken;
+    const login  = state.ghUser?.login || 'author';
+    const date   = new Date().toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+    try {
+        await postProposalComment(number, `${SUGGESTION_DISMISSED}\n❌ **Suggestion dismissed** by @${login} — ${date}`, token);
+        // Remove editor-suggested label if still set
+        const existing = state.currentProposal.labels.map(l => l.name);
+        if (existing.includes('editor-suggested')) {
+            const updatedLabels = await removeLabel(number, 'editor-suggested', token);
+            if (Array.isArray(updatedLabels)) {
+                state.currentProposal = { ...state.currentProposal, labels: updatedLabels };
+            }
+        }
+        state.comments = await fetchProposalComments(number, token);
+        updateUI(true);
+        window.showToast('Suggestion Dismissed', 'The suggestion has been declined.', 'info');
     } catch (e) {
         window.showToast('Error', e.message, 'error');
     }
