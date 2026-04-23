@@ -48,7 +48,37 @@ export function renderConstitution(state) {
     if (!window.selectionHandlerInitialized) {
         window.selectionHandlerInitialized = true;
 
-        // Show floating popup anchored above the selection
+        // Staged selections — array of { id, text, sectionId }
+        window.stagedSelections = window.stagedSelections || [];
+
+        // Re-render the selection bar above the constitution article
+        function renderSelectionBar() {
+            const col = document.getElementById('constitution-col');
+            if (!col) return;
+            let bar = document.getElementById('selection-bar');
+            if (!window.stagedSelections.length) {
+                if (bar) bar.remove();
+                return;
+            }
+            if (!bar) {
+                bar = document.createElement('div');
+                bar.id = 'selection-bar';
+                col.insertBefore(bar, col.firstChild);
+            }
+            bar.style.cssText = 'margin-bottom:16px;padding:12px 16px;background:#1e293b;border-radius:20px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;';
+            bar.innerHTML =
+                `<span style="color:#64748b;font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;flex-shrink:0">Selected</span>` +
+                window.stagedSelections.map(s => {
+                    const preview = s.text.length > 60 ? s.text.slice(0, 57).trimEnd() + '…' : s.text;
+                    return `<span style="display:inline-flex;align-items:center;gap:6px;background:#0f172a;border:1px solid #334155;border-radius:10px;padding:4px 10px;max-width:100%;">
+                        <span style="color:#93c5fd;font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px" title="${s.text.replace(/"/g,"&quot;")}">"${preview}"</span>
+                        <button onclick="window.removeSelection('${s.id}')" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:13px;font-weight:900;padding:0;line-height:1;flex-shrink:0" title="Remove">✕</button>
+                    </span>`;
+                }).join('') +
+                `<span style="color:#334155;font-size:10px;font-weight:700;margin-left:auto;flex-shrink:0">${window.stagedSelections.length} selection${window.stagedSelections.length > 1 ? 's' : ''}</span>`;
+        }
+
+        // Show floating popup above highlighted text
         function showSelectionPopup(rect) {
             let popup = document.getElementById('selection-popup');
             if (!popup) {
@@ -58,34 +88,54 @@ export function renderConstitution(state) {
                 document.body.appendChild(popup);
             }
             const isLoggedIn = !!window.state?.ghToken;
-            popup.innerHTML = isLoggedIn ? `
-                <button onclick="window.addTextToCAP();window.clearConstitutionSelection()" style="background:#2563eb;color:#fff;border:none;border-radius:10px;padding:5px 12px;font-size:11px;font-weight:800;cursor:pointer;letter-spacing:.05em;white-space:nowrap">+ CAP</button>
-                <button onclick="window.addTextToCIS();window.clearConstitutionSelection()" style="background:#7c3aed;color:#fff;border:none;border-radius:10px;padding:5px 12px;font-size:11px;font-weight:800;cursor:pointer;letter-spacing:.05em;white-space:nowrap">+ CIS</button>
-                <button onclick="window.clearConstitutionSelection()" style="background:transparent;color:#94a3b8;border:none;border-radius:10px;padding:5px 8px;font-size:13px;font-weight:900;cursor:pointer;line-height:1" title="Clear selection">✕</button>
-            ` : `
-                <span style="color:#94a3b8;font-size:11px;font-weight:700;padding:0 4px">Login to flag text</span>
-                <button onclick="window.clearConstitutionSelection()" style="background:transparent;color:#94a3b8;border:none;border-radius:10px;padding:5px 8px;font-size:13px;font-weight:900;cursor:pointer;line-height:1" title="Clear selection">✕</button>
-            `;
-            const popupW = 180;
-            const top = rect.top + window.scrollY - popup.offsetHeight - 10;
-            const left = Math.max(8, Math.min(rect.left + rect.width / 2 - popupW / 2, window.innerWidth - popupW - 8));
-            popup.style.top = `${top}px`;
-            popup.style.left = `${left}px`;
+            popup.innerHTML = isLoggedIn
+                ? `<button onclick="window.addTextToCAP()" style="background:#2563eb;color:#fff;border:none;border-radius:10px;padding:5px 12px;font-size:11px;font-weight:800;cursor:pointer;letter-spacing:.05em;white-space:nowrap">+ CAP</button>
+                   <button onclick="window.addTextToCIS()" style="background:#7c3aed;color:#fff;border:none;border-radius:10px;padding:5px 12px;font-size:11px;font-weight:800;cursor:pointer;letter-spacing:.05em;white-space:nowrap">+ CIS</button>`
+                : `<span style="color:#94a3b8;font-size:11px;font-weight:700;padding:0 4px">Login to flag text</span>`;
+            const popupW = 160;
+            popup.style.top = '-9999px';
+            popup.style.left = '-9999px';
             popup.style.display = 'flex';
-            // Reposition after render so offsetHeight is accurate
             requestAnimationFrame(() => {
                 const h = popup.offsetHeight;
-                popup.style.top = `${rect.top + window.scrollY - h - 10}px`;
+                const top = rect.top + window.scrollY - h - 10;
+                const left = Math.max(8, Math.min(rect.left + rect.width / 2 - popupW / 2, window.innerWidth - popupW - 8));
+                popup.style.top = `${top}px`;
+                popup.style.left = `${left}px`;
             });
         }
 
+        // Remove a single staged selection by id
+        window.removeSelection = (id) => {
+            window.stagedSelections = (window.stagedSelections || []).filter(s => s.id !== id);
+            // If the removed selection was the current one, clear it
+            if (window.currentSelection?.id === id) {
+                window.currentSelection = null;
+                window.getSelection()?.removeAllRanges();
+                const popup = document.getElementById('selection-popup');
+                if (popup) popup.style.display = 'none';
+            }
+            // Keep currentSelection pointing to last staged item if any
+            if (!window.currentSelection && window.stagedSelections.length) {
+                window.currentSelection = window.stagedSelections[window.stagedSelections.length - 1];
+            }
+            renderSelectionBar();
+            const summaryEl = document.getElementById('constitution-selection-summary');
+            if (summaryEl) summaryEl.textContent = window.currentSelection
+                ? `${window.currentSelection.text.length} chars selected`
+                : 'Highlight text in the constitution to select it';
+        };
+
+        // Clear everything
         window.clearConstitutionSelection = () => {
             window.currentSelection = null;
+            window.stagedSelections = [];
             window.getSelection()?.removeAllRanges();
             const popup = document.getElementById('selection-popup');
             if (popup) popup.style.display = 'none';
+            renderSelectionBar();
             const summaryEl = document.getElementById('constitution-selection-summary');
-            if (summaryEl) summaryEl.textContent = 'Highlight text below to select';
+            if (summaryEl) summaryEl.textContent = 'Highlight text in the constitution to select it';
         };
 
         document.addEventListener('mouseup', () => {
@@ -95,7 +145,7 @@ export function renderConstitution(state) {
                 const isDiffModeActive = window.state?.constitutionCompareVersion !== null;
 
                 if (text.length > 3 && !isDiffModeActive) {
-                    // Ensure the selection occurred inside the rendered constitution
+                    // Ensure selection is inside the constitution article
                     let node = selection.anchorNode;
                     let insideConstitution = false;
                     while (node && node !== document.body) {
@@ -123,17 +173,24 @@ export function renderConstitution(state) {
                     const sectionId = contextId.split('-')
                         .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
-                    window.currentSelection = { text, sectionId };
+                    // Stage the selection
+                    const id = `sel-${Date.now()}`;
+                    const sel = { id, text, sectionId };
+                    window.currentSelection = sel;
+                    // Add to staged list (avoid exact-text duplicates)
+                    if (!window.stagedSelections.some(s => s.text === text)) {
+                        window.stagedSelections.push(sel);
+                    }
 
-                    // Update sidebar summary if present
+                    // Update sidebar summary
                     const summaryEl = document.getElementById('constitution-selection-summary');
                     if (summaryEl) summaryEl.textContent = `${text.length} chars selected`;
 
-                    // Show floating popup above selection
+                    // Update bar and popup
+                    renderSelectionBar();
                     const range = selection.getRangeAt(0);
                     showSelectionPopup(range.getBoundingClientRect());
                 } else {
-                    // Hide popup when no valid selection
                     const popup = document.getElementById('selection-popup');
                     if (popup) popup.style.display = 'none';
                 }
@@ -142,7 +199,7 @@ export function renderConstitution(state) {
             }
         });
 
-        // Hide popup on Escape
+        // ESC clears everything
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') window.clearConstitutionSelection?.();
         });
@@ -200,7 +257,7 @@ export function renderConstitution(state) {
                         </button>
                         <button onclick="window.clearConstitutionSelection()"
                             class="w-full px-4 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold text-sm hover:bg-slate-100 dark:hover:bg-slate-700 transition-all">
-                            <i data-lucide="x" class="w-4 h-4 inline-block mr-2"></i>Clear Selection
+                            <i data-lucide="x" class="w-4 h-4 inline-block mr-2"></i>Clear All
                         </button>
                         ${wizardInProgress ? `
                         <button onclick="window.returnToWizard()"
@@ -301,7 +358,7 @@ export function renderConstitution(state) {
                 </aside>
 
                 <!-- Constitution Display -->
-                <div class="lg:col-span-3">
+                <div id="constitution-col" class="lg:col-span-3">
                     ${isDiffMode ? renderDiffView(currentVersion, compareVersion) : renderSingleView(currentVersion)}
                 </div>
             </div>
