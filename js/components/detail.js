@@ -406,23 +406,33 @@ export function renderDetail(state) {
                                     const APMRK = '<!-- PORTAL:EDIT_SUGGESTION:APPLIED -->';
                                     const DSMRK = '<!-- PORTAL:EDIT_SUGGESTION:DISMISSED -->';
                                     const allC  = state.comments || [];
-                                    const suggestions  = allC.filter(c => c.body.includes(SMRK));
-                                    const resolutions  = allC.filter(c => c.body.includes(APMRK) || c.body.includes(DSMRK));
-                                    const latestSug    = suggestions[suggestions.length - 1];
-                                    const latestRes    = resolutions[resolutions.length - 1];
-                                    const activeSug    = latestSug && (!latestRes || new Date(latestSug.created_at) > new Date(latestRes.created_at)) ? latestSug : null;
+                                    const suggestions = allC.filter(c => c.body.includes(SMRK));
+                                    const resolutions = allC.filter(c => c.body.includes(APMRK) || c.body.includes(DSMRK));
+                                    const latestSug   = suggestions[suggestions.length - 1];
+                                    const latestRes   = resolutions[resolutions.length - 1];
+                                    const activeSug   = latestSug && (!latestRes || new Date(latestSug.created_at) > new Date(latestRes.created_at)) ? latestSug : null;
 
                                     if (!activeSug) return '';
 
-                                    const rawBody      = activeSug.body.replace(SMRK, '').trim();
-                                    const sugMatch     = rawBody.match(/\*\*Suggestion:\*\*\n([\s\S]*?)(?=\n\n\*\*Reason:|$)/);
-                                    const reasonMatch  = rawBody.match(/\*\*Reason:\*\*\n([\s\S]*?)$/);
-                                    const suggestionText = sugMatch?.[1]?.trim() || rawBody;
-                                    const reason         = reasonMatch?.[1]?.trim() || '';
-                                    const editorLogin    = activeSug.user?.login || 'editor';
-                                    const suggDate       = new Date(activeSug.created_at).toLocaleDateString();
-                                    // Escape for inline onclick attribute
-                                    const escapedText  = suggestionText.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
+                                    // Parse encoded fields for the diff preview
+                                    const dataMatch  = activeSug.body.match(/<!--SUGGESTION_DATA:([^-]+)-->/);
+                                    const encoded    = dataMatch?.[1]?.trim() || '';
+                                    let fields = null;
+                                    try { fields = encoded ? JSON.parse(decodeURIComponent(atob(encoded))) : null; } catch {}
+
+                                    // Parse the reason line
+                                    const reasonMatch  = activeSug.body.match(/\*\*Reason:\*\* (.+)/);
+                                    const reason       = reasonMatch?.[1]?.trim() || '';
+                                    const editorLogin  = activeSug.user?.login || 'editor';
+                                    const suggDate     = new Date(activeSug.created_at).toLocaleDateString();
+
+                                    // Build a simple diff summary (which fields differ from current proposal)
+                                    const currentTitle = p.title;
+                                    const fieldLabels  = { title: 'Title', abstract: 'Summary', motivation: 'Motivation / Problem', analysis: 'Analysis', impact: 'Impact', exhibits: 'Links & Files', revisions: 'Revisions' };
+                                    const changedFields = fields ? Object.entries(fieldLabels).filter(([key]) => {
+                                        const curr = key === 'title' ? p.title : '';
+                                        return fields[key] && fields[key] !== curr;
+                                    }).map(([, label]) => label) : [];
 
                                     return `
                                     <div class="rounded-2xl border-2 border-violet-200 dark:border-violet-800/40 bg-violet-50 dark:bg-violet-900/10 p-5 space-y-4">
@@ -433,12 +443,20 @@ export function renderDetail(state) {
                                             </div>
                                             <span class="text-[9px] text-violet-400 font-bold">@${editorLogin} · ${suggDate}</span>
                                         </div>
-                                        <div class="text-[11px] text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 rounded-xl p-4 border border-violet-100 dark:border-violet-900/30 leading-relaxed max-h-40 overflow-y-auto">
-                                            ${window.marked.parse(suggestionText)}
+
+                                        ${changedFields.length > 0 ? `
+                                        <div class="space-y-1.5">
+                                            <p class="text-[9px] font-black uppercase text-violet-500 tracking-wider">Sections changed</p>
+                                            <div class="flex flex-wrap gap-1.5">
+                                                ${changedFields.map(f => `<span class="px-2.5 py-1 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 text-[9px] font-bold">${f}</span>`).join('')}
+                                            </div>
                                         </div>
-                                        ${reason ? `<p class="text-[10px] text-violet-600 dark:text-violet-400 italic leading-relaxed">${reason}</p>` : ''}
+                                        ` : `<p class="text-[10px] text-violet-600 italic">Revision ready — click Apply to review the suggested changes.</p>`}
+
+                                        ${reason ? `<p class="text-[10px] text-violet-600 dark:text-violet-400 italic leading-relaxed"><span class="font-black not-italic">Reason:</span> ${reason}</p>` : ''}
+
                                         <div class="flex gap-2">
-                                            <button onclick="window.applyEditorSuggestion('${escapedText}', ${activeSug.id})"
+                                            <button onclick="window.applyEditorSuggestion('${encoded}', ${activeSug.id})"
                                                 class="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-[9px] font-black uppercase tracking-wider transition-all">
                                                 <i data-lucide="check" class="w-3 h-3"></i> Apply Edit
                                             </button>
@@ -637,35 +655,13 @@ export function renderDetail(state) {
 
                             <!-- Suggest Edit -->
                             <div class="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-                                <div class="flex items-center justify-between">
-                                    <p class="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Suggest Edit</p>
-                                    <button onclick="window.toggleSuggestionForm()"
-                                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${state.showSuggestionForm ? 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300' : 'bg-violet-50 dark:bg-violet-900/20 text-violet-600 hover:bg-violet-100 dark:hover:bg-violet-900/30'}">
-                                        <i data-lucide="${state.showSuggestionForm ? 'x' : 'plus'}" class="w-3 h-3"></i>
-                                        ${state.showSuggestionForm ? 'Cancel' : 'New'}
-                                    </button>
-                                </div>
-                                ${state.showSuggestionForm ? `
-                                <div class="space-y-3 p-4 bg-violet-50 dark:bg-violet-900/10 rounded-2xl border border-violet-100 dark:border-violet-900/30">
-                                    <div class="space-y-1.5">
-                                        <label class="text-[9px] font-black uppercase tracking-[0.15em] text-violet-600">Suggested change</label>
-                                        <textarea id="suggestion-text" rows="5" placeholder="Describe exactly what should be changed, or paste the revised text..."
-                                            class="w-full text-[11px] p-3 rounded-xl border border-violet-200 dark:border-violet-800/40 bg-white dark:bg-slate-900 text-slate-900 dark:text-white resize-none outline-none focus:ring-2 focus:ring-violet-400 leading-relaxed"></textarea>
-                                    </div>
-                                    <div class="space-y-1.5">
-                                        <label class="text-[9px] font-black uppercase tracking-[0.15em] text-violet-500">Reason <span class="font-normal text-violet-400">(optional)</span></label>
-                                        <textarea id="suggestion-reason" rows="2" placeholder="Why is this change needed?"
-                                            class="w-full text-[11px] p-3 rounded-xl border border-violet-200 dark:border-violet-800/40 bg-white dark:bg-slate-900 text-slate-900 dark:text-white resize-none outline-none focus:ring-2 focus:ring-violet-400 leading-relaxed"></textarea>
-                                    </div>
-                                    <button onclick="window.submitEditorSuggestion()"
-                                        class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-[10px] font-black uppercase tracking-widest transition-all">
-                                        <i data-lucide="send" class="w-3.5 h-3.5"></i>
-                                        Post Suggestion
-                                    </button>
-                                </div>
-                                ` : `
-                                <p class="text-[10px] text-slate-400 italic">Send a suggested revision for the author to review and apply.</p>
-                                `}
+                                <p class="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Suggest Edit</p>
+                                <button onclick="window.startSuggestEdit()"
+                                    class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800/40 text-violet-700 dark:text-violet-300 text-[10px] font-black uppercase tracking-wider hover:bg-violet-100 dark:hover:bg-violet-900/30 transition-all">
+                                    <i data-lucide="message-square-plus" class="w-3.5 h-3.5"></i>
+                                    Suggest Revision
+                                </button>
+                                <p class="text-[10px] text-slate-400 italic">Opens the proposal in an editable form. Your changes are sent to the author for review — nothing is saved until they approve.</p>
                             </div>
                         </div>`;
                     })() : ''}

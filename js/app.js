@@ -25,9 +25,9 @@ import {
 import { renderNav } from './components/nav.js?v=5';
 import { renderDashboard } from './components/dashboard.js?v=3';
 import { renderRegistry } from './components/registry.js?v=7';
-import { renderDetail } from './components/detail.js?v=11';
+import { renderDetail } from './components/detail.js?v=12';
 import { renderCreate } from './components/create.js?v=2';
-import { renderEdit } from './components/edit.js?v=3';
+import { renderEdit } from './components/edit.js?v=4';
 import { renderConstitution } from './components/constitution.js?v=13';
 import { renderWizard } from './components/wizard.js?v=2';
 import { renderLearnHub } from './components/learn.js?v=4';
@@ -355,7 +355,7 @@ window.state = {
     selectedReferences: [],
     expandedEventId: null,
     auditTrailExpanded: false,
-    showSuggestionForm: false,
+    suggestionMode: false,
     activeSuggestionRef: null,
     theme: localStorage.getItem('theme') || 'light',
     draft: {
@@ -467,7 +467,7 @@ window.handleRouting = async () => {
     const hash = window.location.hash || '#/home';
     state.expandedEventId = null;
     state.auditTrailExpanded = false;
-    state.showSuggestionForm = false;
+    state.suggestionMode = false;
     state.activeSuggestionRef = null;
     state.error = null;
 
@@ -809,16 +809,15 @@ window.handleEdit = async (event) => {
         ).catch(() => {}); // non-critical — silently ignore if audit comment fails
 
         // If this edit was triggered by applying an editor suggestion, post the applied marker
-        if (state.activeSuggestionRef) {
+        if (state.activeSuggestionRef?.commentId) {
             const login = state.ghUser?.login || 'author';
             postProposalComment(
                 p.number,
                 `<!-- PORTAL:EDIT_SUGGESTION:APPLIED -->\n✅ **Suggestion applied** by @${login} — ${editTimestamp}`,
                 state.ghToken
             ).catch(() => {});
-            // Remove editor-suggested label if still set
-            const existing = p.labels.map(l => l.name);
-            if (existing.includes('editor-suggested')) {
+            const existingLabels = state.currentProposal?.labels?.map(l => l.name) || [];
+            if (existingLabels.includes('editor-suggested')) {
                 removeLabel(p.number, 'editor-suggested', state.ghToken).catch(() => {});
             }
             state.activeSuggestionRef = null;
@@ -1527,31 +1526,46 @@ window.editorToggleSpecial = async (label) => {
 
 // --- Editor Suggestions ---
 
-const SUGGESTION_MARKER   = '<!-- PORTAL:EDIT_SUGGESTION -->';
-const SUGGESTION_APPLIED  = '<!-- PORTAL:EDIT_SUGGESTION:APPLIED -->';
+const SUGGESTION_MARKER    = '<!-- PORTAL:EDIT_SUGGESTION -->';
+const SUGGESTION_APPLIED   = '<!-- PORTAL:EDIT_SUGGESTION:APPLIED -->';
 const SUGGESTION_DISMISSED = '<!-- PORTAL:EDIT_SUGGESTION:DISMISSED -->';
 
-window.toggleSuggestionForm = () => {
-    state.showSuggestionForm = !state.showSuggestionForm;
+/** Opens the edit form in "suggest" mode — editor edits the live proposal content
+ *  and posts the result as a structured suggestion comment instead of saving it. */
+window.startSuggestEdit = () => {
+    state.suggestionMode   = true;
+    state.activeSuggestionRef = null;
+    state.view             = 'edit';
     updateUI(true);
 };
 
-window.submitEditorSuggestion = async () => {
+/** Reads the suggestion form, encodes all field values as JSON, posts as a comment. */
+window.handleSuggestEdit = async (e) => {
+    e.preventDefault();
     if (!state.isEditor || !state.currentProposal) return;
-    const textEl   = document.getElementById('suggestion-text');
-    const reasonEl = document.getElementById('suggestion-reason');
-    const text   = textEl?.value?.trim();
-    const reason = reasonEl?.value?.trim();
-    if (!text) { window.showToast('Required', 'Please enter your suggestion.', 'error'); return; }
-
-    const number = state.currentProposal.number;
-    const token  = state.ghToken;
-    const login  = state.ghUser?.login || 'editor';
-    const date   = new Date().toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
-
-    const body = `${SUGGESTION_MARKER}\n**Editor @${login} suggested a revision** — ${date}\n\n**Suggestion:**\n${text}${reason ? `\n\n**Reason:**\n${reason}` : ''}`;
+    const form   = e.target;
+    const fields = {
+        title:     form.querySelector('[name=title]')?.value?.trim()             || '',
+        category:  form.querySelector('[name=category]')?.value                  || '',
+        abstract:  form.querySelector('[name=abstract]')?.value?.trim()          || '',
+        revisions: form.querySelector('[name=revisions]')?.value?.trim()         || '',
+        motivation:form.querySelector('[name=motivation]')?.value?.trim()        || '',
+        analysis:  form.querySelector('[name=analysis]')?.value?.trim()          || '',
+        impact:    form.querySelector('[name=impact]')?.value?.trim()            || '',
+        exhibits:  form.querySelector('[name=specification_extra]')?.value?.trim() || '',
+    };
+    const reason  = form.querySelector('[name=suggestion_reason]')?.value?.trim() || '';
+    const number  = state.currentProposal.number;
+    const token   = state.ghToken;
+    const login   = state.ghUser?.login || 'editor';
+    const date    = new Date().toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+    // Encode field data safely (handles unicode, special chars)
+    const encoded = btoa(encodeURIComponent(JSON.stringify(fields)));
+    const body    = `${SUGGESTION_MARKER}\n**Editor @${login} suggested a revision** — ${date}${reason ? `\n\n**Reason:** ${reason}` : ''}\n\n<!--SUGGESTION_DATA:${encoded}-->`;
 
     try {
+        state.loading.submitting = true;
+        updateUI(true);
         await postProposalComment(number, body, token);
         // Auto-apply editor-suggested label if not already set
         const existing = state.currentProposal.labels.map(l => l.name);
@@ -1561,19 +1575,29 @@ window.submitEditorSuggestion = async () => {
                 state.currentProposal = { ...state.currentProposal, labels: updatedLabels };
             }
         }
-        state.showSuggestionForm = false;
+        state.suggestionMode = false;
         state.comments = await fetchProposalComments(number, token);
+        window.openProposal(number, false);
+        window.showToast('Suggestion Posted', 'The author will see your suggested revision.', 'success');
+    } catch (err) {
+        window.showToast('Error', err.message, 'error');
+    } finally {
+        state.loading.submitting = false;
         updateUI(true);
-        window.showToast('Suggestion Posted', 'The author will see your suggestion.', 'success');
-    } catch (e) {
-        window.showToast('Error', e.message, 'error');
     }
 };
 
-window.applyEditorSuggestion = (suggestionText, commentId) => {
-    // Store suggestion as a reference to be shown in the edit view
-    state.activeSuggestionRef = { text: suggestionText, commentId };
-    window.startEdit();
+/** Author applies suggestion — parses encoded fields and pre-populates the edit form. */
+window.applyEditorSuggestion = (encoded, commentId) => {
+    try {
+        const fields = JSON.parse(decodeURIComponent(atob(encoded)));
+        state.activeSuggestionRef = { fields, commentId };
+    } catch {
+        state.activeSuggestionRef = { fields: null, commentId };
+    }
+    state.suggestionMode = false;
+    state.view = 'edit';
+    updateUI(true);
 };
 
 window.dismissEditorSuggestion = async (commentId) => {
@@ -1584,7 +1608,6 @@ window.dismissEditorSuggestion = async (commentId) => {
     const date   = new Date().toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
     try {
         await postProposalComment(number, `${SUGGESTION_DISMISSED}\n❌ **Suggestion dismissed** by @${login} — ${date}`, token);
-        // Remove editor-suggested label if still set
         const existing = state.currentProposal.labels.map(l => l.name);
         if (existing.includes('editor-suggested')) {
             const updatedLabels = await removeLabel(number, 'editor-suggested', token);
@@ -1595,8 +1618,8 @@ window.dismissEditorSuggestion = async (commentId) => {
         state.comments = await fetchProposalComments(number, token);
         updateUI(true);
         window.showToast('Suggestion Dismissed', 'The suggestion has been declined.', 'info');
-    } catch (e) {
-        window.showToast('Error', e.message, 'error');
+    } catch (err) {
+        window.showToast('Error', err.message, 'error');
     }
 };
 

@@ -25,23 +25,42 @@ function renderToolbar(targetId) {
 
 /**
  * Edit Component
- * Allows authors to modify existing CAPs or CISs.
- * Mirrors the intake structure used in the creation component.
+ * Three modes:
+ *  1. Normal edit  (state.suggestionMode=false, state.activeSuggestionRef=null)
+ *  2. Suggestion   (state.suggestionMode=true)  — editor edits live content, posts as suggestion
+ *  3. Apply        (state.activeSuggestionRef has .fields) — author's form pre-populated from suggestion
  */
 export function renderEdit(state) {
     const p = state.currentProposal;
     if (!p) return '';
 
-    const isCIS = p.labels.some(l => l.name === 'CIS');
-    const type = isCIS ? 'CIS' : 'CAP';
-    
-    // Extraction helper to pull content from Markdown headers
+    const isCIS         = p.labels.some(l => l.name === 'CIS');
+    const type          = isCIS ? 'CIS' : 'CAP';
+    const isSuggest     = state.suggestionMode === true;
+    const applyFields   = state.activeSuggestionRef?.fields || null;
+
+    // Extraction helper — reads from suggestion fields when applying, otherwise from p.body
     const getSection = (header) => {
-        // Escaping backslashes for the RegExp constructor
+        if (applyFields) {
+            const fieldMap = {
+                'Summary': 'abstract', 'Abstract': 'abstract',
+                'Structured Revisions (Contextual)': 'revisions',
+                'Why is this change needed?': 'motivation', 'Motivation': 'motivation',
+                'Problem': 'motivation', 'Statement of Problem': 'motivation',
+                'Analysis & Test': 'analysis', 'Context': 'analysis',
+                'Impact': 'impact',
+                'Links and Files': 'exhibits', 'Supporting Exhibits (Links)': 'exhibits',
+            };
+            const field = fieldMap[header];
+            return field ? (applyFields[field] || '') : '';
+        }
         const regex = new RegExp(`### ${header}\\n([\\s\\S]*?)(?=\\n### |$)`, 'i');
         const match = p.body?.match(regex);
         return match ? match[1].trim() : '';
     };
+
+    const currentTitle    = applyFields?.title    || p.title;
+    const currentCategory = applyFields?.category || '';
 
     const categories = [
         {
@@ -82,47 +101,48 @@ export function renderEdit(state) {
         }
     ];
 
-    const currentCatLabel = p.labels.find(l => categories.some(c => c.id === l.name))?.name || '';
+    const currentCatLabel = currentCategory || p.labels.find(l => categories.some(c => c.id === l.name))?.name || '';
+
+    const accentColor  = isSuggest ? 'violet' : applyFields ? 'violet' : 'blue';
+    const headerIcon   = isSuggest ? 'message-square-plus' : applyFields ? 'check-square' : 'edit-3';
+    const headerTitle  = isSuggest ? 'Suggest Revision' : applyFields ? 'Apply Suggestion' : 'Edit';
+    const headerSub    = isSuggest
+        ? `Suggesting changes to <span class="text-violet-600 font-bold">${type} #${p.number}</span>. Your changes will be sent to the author for review.`
+        : applyFields
+        ? `Reviewing suggested revision for <span class="text-violet-600 font-bold">${type} #${p.number}</span>. Fields are pre-populated — adjust if needed, then save.`
+        : `Modifying <span class="text-blue-600 font-bold">${type} #${p.number}</span>.`;
+    const backLabel    = isSuggest ? 'Cancel Suggestion' : 'Discard Changes';
+    const backAction   = isSuggest || applyFields ? `state.suggestionMode=false; state.activeSuggestionRef=null; window.setView('detail')` : `window.setView('detail')`;
+    const submitAction = isSuggest ? 'window.handleSuggestEdit(event)' : 'window.handleEdit(event)';
+    const submitLabel  = isSuggest ? '💡 Post Suggestion' : applyFields ? '✅ Save & Apply' : 'Update Record';
+    const submitColor  = isSuggest || applyFields ? 'violet' : 'blue';
 
     return `
         <div class="max-w-4xl mx-auto pb-20 text-left fade-in">
             <!-- Header Section -->
             <header class="mb-16">
-                <button onclick="window.setView('detail')" class="group flex items-center gap-2 text-slate-400 hover:text-blue-600 transition-colors mb-6 font-bold uppercase text-xs tracking-widest">
+                <button onclick="${backAction}" class="group flex items-center gap-2 text-slate-400 hover:text-${accentColor}-600 transition-colors mb-6 font-bold uppercase text-xs tracking-widest">
                     <i data-lucide="arrow-left" class="w-4 h-4 group-hover:-translate-x-1 transition-transform"></i>
-                    Discard Changes
+                    ${backLabel}
                 </button>
                 <div class="flex items-center gap-4 mb-4">
-                    <div class="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg text-white">
-                        <i data-lucide="edit-3" class="w-6 h-6"></i>
+                    <div class="w-12 h-12 bg-${accentColor}-600 rounded-2xl flex items-center justify-center shadow-lg text-white">
+                        <i data-lucide="${headerIcon}" class="w-6 h-6"></i>
                     </div>
-                    <h1 class="text-6xl font-black italic tracking-tighter text-slate-900 dark:text-white uppercase leading-none">Edit</h1>
+                    <h1 class="text-6xl font-black italic tracking-tighter text-slate-900 dark:text-white uppercase leading-none">${headerTitle}</h1>
                 </div>
-                <p class="text-slate-500 text-xl font-medium">Modifying <span class="text-blue-600 font-bold">${type} #${p.number}</span>.</p>
+                <p class="text-slate-500 text-xl font-medium">${headerSub}</p>
             </header>
 
-            ${state.activeSuggestionRef ? `
-            <div class="mb-10 p-6 rounded-[2rem] border-2 border-violet-200 dark:border-violet-800/40 bg-violet-50 dark:bg-violet-900/10 space-y-4">
-                <div class="flex items-center gap-2 text-violet-700 dark:text-violet-400">
-                    <i data-lucide="message-square-plus" class="w-4 h-4 flex-shrink-0"></i>
-                    <span class="text-xs font-black uppercase tracking-wider">Editor's Suggestion — Reference</span>
-                    <span class="ml-auto text-[10px] text-violet-400 font-bold">Apply the changes below using this as a guide</span>
-                </div>
-                <div class="text-sm text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 rounded-xl p-5 border border-violet-100 dark:border-violet-900/30 leading-relaxed prose dark:prose-invert max-w-none max-h-56 overflow-y-auto">
-                    ${window.marked ? window.marked.parse(state.activeSuggestionRef.text) : state.activeSuggestionRef.text}
-                </div>
-            </div>
-            ` : ''}
-
-            <form onsubmit="window.handleEdit(event)" class="space-y-12">
+            <form onsubmit="${submitAction}" class="space-y-12">
                 
                 <!-- Section 1: Classification & Core Meta -->
                 <div class="bg-white dark:bg-slate-900 p-10 sm:p-14 rounded-[4rem] border border-slate-100 dark:border-slate-800 shadow-sm space-y-10">
                     <div class="space-y-10">
                         <div class="space-y-3">
-                            <label class="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 ml-4">Title</label>
-                            <input name="title" required value="${p.title}"
-                                class="w-full bg-slate-50 dark:bg-slate-950 p-6 rounded-3xl text-2xl font-black outline-none border-2 border-transparent focus:border-blue-600 transition-all text-slate-900 dark:text-white">
+                            <label class="text-[10px] font-black uppercase tracking-[0.2em] text-${accentColor}-600 ml-4">Title</label>
+                            <input name="title" required value="${currentTitle}"
+                                class="w-full bg-slate-50 dark:bg-slate-950 p-6 rounded-3xl text-2xl font-black outline-none border-2 border-transparent focus:border-${accentColor}-600 transition-all text-slate-900 dark:text-white">
                         </div>
 
                         <div class="space-y-6">
@@ -262,7 +282,19 @@ ${getSection('Institutional Assets')}
                     </div>
                 </div>
 
-                <!-- Section 4: Governance Verification -->
+                <!-- Suggestion Reason (shown only in suggestion mode) -->
+                ${isSuggest ? `
+                <div class="bg-violet-50 dark:bg-violet-900/10 p-10 sm:p-14 rounded-[4rem] border border-violet-100 dark:border-violet-800/30 space-y-6">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="info" class="w-4 h-4 text-violet-600"></i>
+                        <h3 class="text-[10px] font-black uppercase tracking-[0.4em] text-violet-600">Reason for Suggestion</h3>
+                        <span class="text-[9px] text-violet-400 font-bold ml-auto">Optional</span>
+                    </div>
+                    <textarea name="suggestion_reason" rows="3" placeholder="Explain why you are suggesting these changes..."
+                        class="w-full bg-white dark:bg-slate-900 p-6 rounded-3xl font-medium text-lg outline-none border-2 border-violet-100 dark:border-violet-800 focus:border-violet-500 transition-all text-slate-900 dark:text-white resize-none"></textarea>
+                </div>
+                ` : `
+                <!-- Section 4: Governance Verification (normal edit only) -->
                 <div class="bg-blue-50/50 dark:bg-blue-900/10 p-10 sm:p-14 rounded-[4rem] border border-blue-100 dark:border-blue-800/30 space-y-8">
                     <h3 class="text-[10px] font-black uppercase tracking-[0.4em] text-blue-600 ml-4 mb-4">Governance Verification</h3>
                     <div class="space-y-6">
@@ -277,15 +309,16 @@ ${getSection('Institutional Assets')}
                         </label>
                     </div>
                 </div>
+                `}
 
                 <div class="flex flex-col sm:flex-row gap-6">
-                    <button type="button" onclick="window.setView('detail')" 
+                    <button type="button" onclick="${backAction}"
                         class="flex-1 bg-white dark:bg-slate-900 text-slate-500 p-8 rounded-[3rem] text-xl font-black border border-slate-200 dark:border-slate-800 hover:bg-slate-50 transition-all">
                         Cancel
                     </button>
-                    <button type="submit" ${state.loading.submitting ? 'disabled' : ''} 
-                        class="flex-[2] group bg-blue-600 hover:bg-blue-700 text-white p-8 rounded-[3rem] text-2xl font-black shadow-2xl hover:-translate-y-1 active:scale-95 transition-all flex items-center justify-center gap-4 disabled:opacity-50">
-                        ${state.loading.submitting ? 'Syncing...' : '<i data-lucide="save" class="w-6 h-6"></i> Update Record'}
+                    <button type="submit" ${state.loading.submitting ? 'disabled' : ''}
+                        class="flex-[2] group bg-${submitColor}-600 hover:bg-${submitColor}-700 text-white p-8 rounded-[3rem] text-2xl font-black shadow-2xl hover:-translate-y-1 active:scale-95 transition-all flex items-center justify-center gap-4 disabled:opacity-50">
+                        ${state.loading.submitting ? 'Saving...' : submitLabel}
                     </button>
                 </div>
             </form>
