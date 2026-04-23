@@ -1394,6 +1394,11 @@ window.editorSetLifecycle = async (stage) => {
         for (const lbl of LIFECYCLE_LABELS) {
             if (existing.includes(lbl)) await removeLabel(number, lbl, token);
         }
+        // Also remove legacy labels from the old lifecycle model
+        const LEGACY_LIFECYCLE_LABELS = ['Draft', 'Proposed', 'Deliberation-Period'];
+        for (const lbl of LEGACY_LIFECYCLE_LABELS) {
+            if (existing.includes(lbl)) await removeLabel(number, lbl, token);
+        }
         // Clear author-ready signal — it was for this step only
         if (existing.includes('author-ready')) await removeLabel(number, 'author-ready', token);
         // Clear stage-specific status tags that no longer apply
