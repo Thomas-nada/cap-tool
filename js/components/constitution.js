@@ -151,7 +151,9 @@ export function renderConstitution(state) {
             if (summaryEl) summaryEl.textContent = 'Highlight text in the constitution to select it';
         };
 
-        document.addEventListener('mouseup', () => {
+        document.addEventListener('mouseup', (e) => {
+            // If the click landed inside the popup, let the button's click handler run uninterrupted
+            if (document.getElementById('selection-popup')?.contains(e.target)) return;
             try {
                 const selection = window.getSelection();
                 const text = selection.toString().trim();
