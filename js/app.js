@@ -25,7 +25,7 @@ import {
 import { renderNav } from './components/nav.js?v=5';
 import { renderDashboard } from './components/dashboard.js?v=3';
 import { renderRegistry } from './components/registry.js?v=7';
-import { renderDetail } from './components/detail.js?v=8';
+import { renderDetail } from './components/detail.js?v=9';
 import { renderCreate } from './components/create.js?v=2';
 import { renderEdit } from './components/edit.js?v=2';
 import { renderConstitution } from './components/constitution.js?v=13';
@@ -1304,12 +1304,15 @@ window.authorSignalReady = async () => {
     const token = state.ghToken;
     try {
         const isOn = state.currentProposal.labels.some(l => l.name === 'author-ready');
-        if (isOn) {
-            await removeLabel(number, 'author-ready', token);
+        // Use the API response directly to avoid stale-cache re-fetch
+        const updatedLabels = isOn
+            ? await removeLabel(number, 'author-ready', token)
+            : await addLabel(number, 'author-ready', token);
+        if (Array.isArray(updatedLabels)) {
+            state.currentProposal = { ...state.currentProposal, labels: updatedLabels };
         } else {
-            await addLabel(number, 'author-ready', token);
+            state.currentProposal = await fetchProposalDetail(number, token);
         }
-        state.currentProposal = await fetchProposalDetail(number, token);
         updateUI(true);
         window.showToast(
             isOn ? 'Signal Withdrawn' : 'Ready Signal Sent',
@@ -1395,9 +1398,14 @@ window.editorSetLifecycle = async (stage) => {
         for (const lbl of (STAGE_CLEANUP_TAGS[current] || [])) {
             if (existing.includes(lbl)) await removeLabel(number, lbl, token);
         }
-        await addLabel(number, stage, token);
-        // Refresh
-        state.currentProposal = await fetchProposalDetail(number, token);
+        // addLabel response contains the final label list after all removes + this add
+        const updatedLabels = await addLabel(number, stage, token);
+        if (Array.isArray(updatedLabels)) {
+            state.currentProposal = { ...state.currentProposal, labels: updatedLabels };
+        } else {
+            state.currentProposal = await fetchProposalDetail(number, token);
+        }
+        state.proposalEvents = await fetchProposalEvents(number, token);
         updateUI(true);
         window.showToast('Stage Updated', `Moved to: ${stage}`, 'success');
     } catch (e) {
@@ -1412,12 +1420,15 @@ window.editorToggleStatusTag = async (label) => {
     try {
         const existing = state.currentProposal.labels.map(l => l.name);
         const isOn = existing.includes(label);
-        if (isOn) {
-            await removeLabel(number, label, token);
+        // GitHub returns the updated label array directly — use it to avoid stale cache re-fetch
+        const updatedLabels = isOn
+            ? await removeLabel(number, label, token)
+            : await addLabel(number, label, token);
+        if (Array.isArray(updatedLabels)) {
+            state.currentProposal = { ...state.currentProposal, labels: updatedLabels };
         } else {
-            await addLabel(number, label, token);
+            state.currentProposal = await fetchProposalDetail(number, token);
         }
-        state.currentProposal = await fetchProposalDetail(number, token);
         updateUI(true);
         window.showToast('Tag Updated', isOn ? `Removed: ${label}` : `Added: ${label}`, 'success');
     } catch (e) {
@@ -1432,13 +1443,23 @@ window.editorToggleSignal = async (label) => {
     try {
         const existing = state.currentProposal.labels.map(l => l.name);
         const isOn = existing.includes(label);
-        // Remove all signal labels (mutually exclusive)
+        // Remove all signal labels (mutually exclusive); track last response
+        let latestLabels = null;
         for (const lbl of EDITOR_SIGNAL_LABELS) {
-            if (existing.includes(lbl)) await removeLabel(number, lbl, token);
+            if (existing.includes(lbl)) {
+                latestLabels = await removeLabel(number, lbl, token);
+            }
         }
-        // If it wasn't already on, set it
-        if (!isOn) await addLabel(number, label, token);
-        state.currentProposal = await fetchProposalDetail(number, token);
+        // If it wasn't already on, add it — response contains the final label list
+        if (!isOn) {
+            latestLabels = await addLabel(number, label, token);
+        }
+        // Use the API response directly to avoid stale-cache re-fetch
+        if (Array.isArray(latestLabels)) {
+            state.currentProposal = { ...state.currentProposal, labels: latestLabels };
+        } else {
+            state.currentProposal = await fetchProposalDetail(number, token);
+        }
         updateUI(true);
         window.showToast('Signal Updated', isOn ? `Removed: ${label}` : `Set: ${label}`, 'success');
     } catch (e) {
@@ -1453,12 +1474,15 @@ window.editorToggleSpecial = async (label) => {
     try {
         const existing = state.currentProposal.labels.map(l => l.name);
         const isOn = existing.includes(label);
-        if (isOn) {
-            await removeLabel(number, label, token);
+        // GitHub returns the updated label array directly — use it to avoid stale cache re-fetch
+        const updatedLabels = isOn
+            ? await removeLabel(number, label, token)
+            : await addLabel(number, label, token);
+        if (Array.isArray(updatedLabels)) {
+            state.currentProposal = { ...state.currentProposal, labels: updatedLabels };
         } else {
-            await addLabel(number, label, token);
+            state.currentProposal = await fetchProposalDetail(number, token);
         }
-        state.currentProposal = await fetchProposalDetail(number, token);
         updateUI(true);
         window.showToast('Label Updated', isOn ? `Removed: ${label}` : `Added: ${label}`, 'success');
     } catch (e) {
