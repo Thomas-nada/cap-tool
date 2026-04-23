@@ -54,8 +54,14 @@ export function renderEdit(state) {
             const field = fieldMap[header];
             return field ? (applyFields[field] || '') : '';
         }
-        const regex = new RegExp(`### ${header}\\n([\\s\\S]*?)(?=\\n### |$)`, 'i');
-        const match = p.body?.match(regex);
+        // Normalise CRLF → LF and escape regex metacharacters in the header name.
+        // Without escaping, headers like "Structured Revisions (Contextual)" create
+        // an unintended capture group so match[1] returns "Contextual" not the content,
+        // and "Why is this change needed?" has a bare `?` which makes `d` optional.
+        const normalised = (p.body || '').replace(/\r\n/g, '\n');
+        const escaped    = header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex      = new RegExp(`### ${escaped}\\n([\\s\\S]*?)(?=\\n## |$)`, 'i');
+        const match      = normalised.match(regex);
         return match ? match[1].trim() : '';
     };
 
