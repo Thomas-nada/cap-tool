@@ -440,8 +440,9 @@ export function renderDetail(state) {
                             cfg.stages === null || (currentLifecycle && cfg.stages.includes(currentLifecycle))
                         );
 
-                        // Forward-only single step: consultation→ready, ready→done
-                        const editorNextStage = currentLifecycle === 'consultation' ? 'ready'
+                        // Forward-only single step: (unset/legacy)→consultation, consultation→ready, ready→done
+                        const editorNextStage = currentLifecycle === null           ? 'consultation'
+                                              : currentLifecycle === 'consultation' ? 'ready'
                                               : currentLifecycle === 'ready'        ? 'done'
                                               : null;
                         const nextCfg = editorNextStage ? lifecycleConfig[editorNextStage] : null;
