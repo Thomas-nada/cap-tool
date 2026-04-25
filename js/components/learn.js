@@ -68,6 +68,9 @@ export function renderLearnHub(state) {
                     <p class="text-slate-500 mb-6">New to Cardano governance? Start here.</p>
                     
                     <div class="space-y-3">
+                        <button onclick="window.openGuide('about-the-cap-process')" class="w-full p-4 rounded-2xl border-2 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm font-bold text-left hover:-translate-y-0.5 transition-all">
+                            🏛️ How the CAP Process Was Built
+                        </button>
                         <button onclick="window.openGuide('intro-to-caps-and-cis')" class="w-full p-4 rounded-2xl border-2 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm font-bold text-left hover:-translate-y-0.5 transition-all">
                             📘 Introduction to CAPs & CIS
                         </button>
