@@ -151,11 +151,9 @@ There are also tags for special situations: grouping small changes together, put
 
 The working group didn't design in isolation. Two major workshops brought in voices from beyond the core group:
 
-The **Day Zero Workshop** at the Cardano Summit was the first public test of the concepts, held before the design was even finished. It was about socializing the idea and hearing reactions from people who hadn't been part of the internal debates.
+The **Day Zero Workshop** in Berlin was the first public test of the concepts, held before the design was even finished. It brought in community members who were entirely new to the process, gathering structured feedback and hearing reactions from people who hadn't been part of the internal debates. Their input directly shaped decisions about the tool. If people who hadn't lived the design process couldn't figure something out, that was a signal something needed to change.
 
-The **Berlin Workshop** was more structured, gathering detailed feedback from community members who were entirely new to the process. Their reactions directly shaped decisions about the tool. If people who hadn't lived the design process couldn't figure something out, that was a signal something needed to change.
-
-Both workshops and all meeting transcripts are available publicly, in the [workshops folder](https://drive.google.com/drive/folders/1j_fmp8fShyeL10LnPh0L8rkjYgk6q4Sh?usp=sharing) and the [meeting transcripts folder](https://drive.google.com/drive/folders/1oILReUq36yM3J-eYABr_9dY9R3l3heOJ?usp=sharing).
+The workshop materials and all meeting transcripts are available publicly, in the [workshops folder](https://drive.google.com/drive/folders/1j_fmp8fShyeL10LnPh0L8rkjYgk6q4Sh?usp=sharing) and the [meeting transcripts folder](https://drive.google.com/drive/folders/1oILReUq36yM3J-eYABr_9dY9R3l3heOJ?usp=sharing).
 
 ---
 
