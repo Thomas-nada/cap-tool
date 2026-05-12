@@ -654,6 +654,29 @@ export function renderDetail(state) {
                             <!-- Suggest Edit -->
                             <div class="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800">
                                 <p class="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Suggest Edit</p>
+
+                                ${(() => {
+                                    const SMRK  = '<!-- PORTAL:EDIT_SUGGESTION -->';
+                                    const APMRK = '<!-- PORTAL:EDIT_SUGGESTION:APPLIED -->';
+                                    const DSMRK = '<!-- PORTAL:EDIT_SUGGESTION:DISMISSED -->';
+                                    const allC  = state.comments || [];
+                                    const suggestions = allC.filter(c => c.body.includes(SMRK));
+                                    const resolutions = allC.filter(c => c.body.includes(APMRK) || c.body.includes(DSMRK));
+                                    const latestSug = suggestions[suggestions.length - 1];
+                                    const latestRes = resolutions[resolutions.length - 1];
+                                    const activeSug = latestSug && (!latestRes || new Date(latestSug.created_at) > new Date(latestRes.created_at)) ? latestSug : null;
+                                    if (!activeSug) return '';
+                                    const suggDate = new Date(activeSug.created_at).toLocaleDateString();
+                                    return `
+                                    <div class="flex items-start gap-3 px-4 py-3 rounded-2xl bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800/40">
+                                        <i data-lucide="clock" class="w-3.5 h-3.5 text-violet-500 flex-shrink-0 mt-0.5"></i>
+                                        <div>
+                                            <span class="text-[10px] font-black uppercase tracking-wider text-violet-700 dark:text-violet-400 block">Suggestion Pending</span>
+                                            <span class="text-[9px] text-violet-500">Posted ${suggDate} — awaiting author response.</span>
+                                        </div>
+                                    </div>`;
+                                })()}
+
                                 <button onclick="window.startSuggestEdit()"
                                     class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800/40 text-violet-700 dark:text-violet-300 text-[10px] font-black uppercase tracking-wider hover:bg-violet-100 dark:hover:bg-violet-900/30 transition-all">
                                     <i data-lucide="message-square-plus" class="w-3.5 h-3.5"></i>
