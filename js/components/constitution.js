@@ -102,7 +102,9 @@ export function renderConstitution(state) {
             requestAnimationFrame(() => {
                 const h = popup.offsetHeight;
                 const popupW = popup.offsetWidth;
-                const top = rect.top + window.scrollY - h - 10;
+                const topAbove = rect.top + window.scrollY - h - 10;
+                const topBelow = rect.bottom + window.scrollY + 10;
+                const top = topAbove >= window.scrollY ? topAbove : topBelow;
                 const left = Math.max(8, Math.min(rect.left + rect.width / 2 - popupW / 2, window.innerWidth - popupW - 8));
                 popup.style.top = `${top}px`;
                 popup.style.left = `${left}px`;

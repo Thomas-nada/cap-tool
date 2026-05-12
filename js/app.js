@@ -1815,14 +1815,55 @@ window.returnToWizard = () => {
 };
 
 window.manualTextEntry = () => {
-    const section = prompt('Section name (e.g., "Article III"):');
-    if (!section) return;
-    
-    const text = prompt('Original text to change:');
-    if (!text) return;
-    
-    state.wizardData.selectedText.push({ section, text });
+    const existing = document.getElementById('manual-entry-modal');
+    if (existing) { existing.remove(); return; }
+
+    const modal = document.createElement('div');
+    modal.id = 'manual-entry-modal';
+    modal.className = 'fixed inset-0 z-[400] flex items-center justify-center p-4';
+    modal.innerHTML = `
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="document.getElementById('manual-entry-modal').remove()"></div>
+        <div class="relative bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-lg p-8">
+            <h2 class="text-lg font-black tracking-tight text-slate-900 dark:text-white mb-6">Add Text Manually</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1">Section Name</label>
+                    <input id="manual-section" type="text" placeholder='e.g. "Article III"'
+                        class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1">Original Text to Change</label>
+                    <textarea id="manual-text" rows="4" placeholder="Paste the exact text from the constitution that you want to change..."
+                        class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none"></textarea>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button onclick="document.getElementById('manual-entry-modal').remove()"
+                    class="flex-1 py-3 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                    Cancel
+                </button>
+                <button onclick="window.submitManualEntry()"
+                    class="flex-1 py-3 rounded-xl text-sm font-black text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-lg">
+                    Add Selection
+                </button>
+            </div>
+        </div>`;
+    document.body.appendChild(modal);
+    document.getElementById('manual-section').focus();
+};
+
+window.submitManualEntry = () => {
+    const section = document.getElementById('manual-section')?.value.trim();
+    const text = document.getElementById('manual-text')?.value.trim();
+    if (!text) {
+        window.showToast('Missing Text', 'Please enter the original text to change.', 'warning');
+        return;
+    }
+    if (!state.wizardData.selectedText) state.wizardData.selectedText = [];
+    state.wizardData.selectedText.push({ section: section || 'General', text });
+    document.getElementById('manual-entry-modal').remove();
     window.updateUI(true);
+    window.showToast('Added', 'Text selection added to your proposal.', 'success');
 };
 
 window.copyGitHubMarkdown = () => {
