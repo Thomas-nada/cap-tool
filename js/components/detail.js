@@ -353,7 +353,7 @@ export function renderDetail(state) {
                         const editorOkEver = state.proposalEvents?.some(e => e.event === 'labeled' && e.label?.name === 'editor-ok') || false;
                         const editorConcernNow = p.labels.some(l => l.name === 'editor-concern');
                         const authorReadyNow = p.labels.some(l => l.name === 'author-ready');
-                        const isActive = currentStage === 'consultation' || currentStage === 'ready';
+                        const isActive = !currentStage || currentStage === 'consultation' || currentStage === 'ready';
 
                         // Context-sensitive signal text
                         const signalText = currentStage === 'consultation' ? 'Signal Ready for Review Board'
