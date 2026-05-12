@@ -626,8 +626,8 @@ export function renderKanban(state) {
         );
     }
 
-    // Bucket — lifecycle labels map 1:1 to columns, no fallback needed
-    const STAGE_FALLBACK = {};
+    // Bucket — proposals with no lifecycle label fall back to consultation column
+    const STAGE_FALLBACK = { 'draft': 'consultation' };
     const buckets = {};
     LIFECYCLE_COLUMNS.forEach(c => { buckets[c.key] = []; });
     filtered.forEach(p => {
