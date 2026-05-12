@@ -802,9 +802,25 @@ window.handleEdit = async (event) => {
 
         // Post a non-blocking audit record so the edit appears in the proposal trail
         const editTimestamp = new Date().toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+        const oldBody = p.body || '';
+        const getOldField = (header) => {
+            const norm = oldBody.replace(/\r\n/g, '\n');
+            const esc  = header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const m    = norm.match(new RegExp(`### ${esc}\\n([\\s\\S]*?)(?=\\n### |\\n## |$)`, 'i'));
+            return m ? m[1].trim() : '';
+        };
+        const changedFields = [];
+        if (title !== (p.title || ''))           changedFields.push('Title');
+        if (abstract !== getOldField('Summary'))  changedFields.push('Summary');
+        if (motivation !== (getOldField('Why is this change needed?') || getOldField('Problem'))) changedFields.push('Motivation');
+        if (analysis   !== (getOldField('Analysis & Test') || getOldField('Context')))             changedFields.push('Analysis');
+        if (impact     !== (getOldField('Impact')))                                                changedFields.push('Impact');
+        if (exhibits   !== (getOldField('Links and Files')))                                       changedFields.push('Links & Files');
+        const changedNote = changedFields.length > 0 ? `\n\n**Changed:** ${changedFields.join(', ')}` : '';
+        const revisionTag = p.labels?.some(l => l.name === 'revision') ? '\n🔁 _Revision mode edit_' : '';
         postProposalComment(
             p.number,
-            `<!-- PORTAL:EDIT_AUDIT -->\n✏️ **Proposal edited** by @${state.ghUser?.login || 'author'} — ${editTimestamp}`,
+            `<!-- PORTAL:EDIT_AUDIT -->\n✏️ **Proposal edited** by @${state.ghUser?.login || 'author'} — ${editTimestamp}${changedNote}${revisionTag}`,
             state.ghToken
         ).catch(() => {}); // non-critical — silently ignore if audit comment fails
 

@@ -353,6 +353,7 @@ export function renderDetail(state) {
                         const editorOkEver = state.proposalEvents?.some(e => e.event === 'labeled' && e.label?.name === 'editor-ok') || false;
                         const editorConcernNow = p.labels.some(l => l.name === 'editor-concern');
                         const authorReadyNow = p.labels.some(l => l.name === 'author-ready');
+                        const isRevisionMode = p.labels.some(l => l.name === 'revision');
                         const isActive = !currentStage || currentStage === 'consultation' || currentStage === 'ready';
 
                         // Context-sensitive signal text
@@ -372,6 +373,16 @@ export function renderDetail(state) {
                         return `
                         <div class="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border-2 border-blue-100 dark:border-blue-900/20 shadow-xl space-y-6">
                             <h3 class="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600">Author Controls</h3>
+
+                            <!-- Revision Mode Banner -->
+                            ${isRevisionMode ? `
+                            <div class="flex items-start gap-3 px-4 py-3 rounded-2xl bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800/40">
+                                <i data-lucide="pencil-line" class="w-3.5 h-3.5 text-orange-500 flex-shrink-0 mt-0.5"></i>
+                                <div>
+                                    <span class="text-[10px] font-black uppercase tracking-wider text-orange-700 dark:text-orange-400 block">Amendment Revision Active</span>
+                                    <span class="text-[9px] text-orange-500 leading-relaxed">The editor has flagged this proposal for revision. Use Edit Proposal below to make your changes — each save is permanently recorded in the audit trail. The deliberation clock continues running.</span>
+                                </div>
+                            </div>` : ''}
 
                             <!-- Editor Review Status -->
                             <div class="flex items-center gap-2.5 px-4 py-3 rounded-2xl border text-[10px] font-bold ${reviewStatus.cls}">
