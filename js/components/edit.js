@@ -43,13 +43,25 @@ export function renderEdit(state) {
     const getSection = (header) => {
         if (applyFields) {
             const fieldMap = {
-                'Summary': 'abstract', 'Abstract': 'abstract',
-                'Structured Revisions (Contextual)': 'revisions', 'Revisions': 'revisions',
-                'Why is this change needed?': 'motivation', 'Motivation': 'motivation',
-                'Problem': 'motivation', 'Statement of Problem': 'motivation',
-                'Analysis & Test': 'analysis', 'Context': 'analysis',
+                // Portal-canonical names
+                'Summary': 'abstract',
+                'Why is this change needed?': 'motivation',
+                'Analysis & Test': 'analysis',
+                'Revisions': 'revisions',
+                'Structured Revisions (Contextual)': 'revisions',
+                'Problem': 'motivation',
+                'Context': 'analysis',
                 'Impact': 'impact',
-                'Links and Files': 'exhibits', 'Supporting Exhibits (Links)': 'exhibits',
+                'Links and Files': 'exhibits',
+                // Legacy GitHub template names (backward compat)
+                'Abstract': 'abstract',
+                'Motivation': 'motivation',
+                'Analysis': 'analysis',
+                'Impact Assessment': 'impact',
+                'Proposed Revisions': 'revisions',
+                'Discussion Points': 'analysis',
+                'Statement of Problem': 'motivation',
+                'Supporting Exhibits (Links)': 'exhibits',
             };
             const field = fieldMap[header];
             return field ? (applyFields[field] || '') : '';
@@ -186,7 +198,7 @@ export function renderEdit(state) {
                     <p class="text-xs font-bold text-slate-400 px-4 mb-4">Modify the combined contextual revision block below.</p>
                     ${renderToolbar('edit-revisions')}
                     <textarea name="revisions" id="edit-revisions" required
-                        class="w-full bg-slate-50 dark:bg-slate-950 p-8 rounded-[3rem] min-h-[300px] font-mono text-sm outline-none border-2 border-transparent focus:border-blue-600 transition-all text-slate-900 dark:text-white shadow-inner">${getSection('Structured Revisions (Contextual)') || getSection('Revisions')}</textarea>
+                        class="w-full bg-slate-50 dark:bg-slate-950 p-8 rounded-[3rem] min-h-[300px] font-mono text-sm outline-none border-2 border-transparent focus:border-blue-600 transition-all text-slate-900 dark:text-white shadow-inner">${getSection('Structured Revisions (Contextual)') || getSection('Revisions') || getSection('Proposed Revisions')}</textarea>
                 </div>
 
                 <!-- Section 3: Why? / Motivation & Assets -->
@@ -212,7 +224,7 @@ export function renderEdit(state) {
                             <p class="text-[10px] text-slate-400 ml-4">Consequences if this issue goes unaddressed.</p>
                             ${renderToolbar('edit-impact')}
                             <textarea name="impact" id="edit-impact"
-                                class="w-full bg-slate-50 dark:bg-slate-950 p-8 rounded-3xl min-h-[160px] font-medium text-lg outline-none border-2 border-transparent focus:border-blue-600 transition-all text-slate-900 dark:text-white">${getSection('Impact')}</textarea>
+                                class="w-full bg-slate-50 dark:bg-slate-950 p-8 rounded-3xl min-h-[160px] font-medium text-lg outline-none border-2 border-transparent focus:border-blue-600 transition-all text-slate-900 dark:text-white">${getSection('Impact') || getSection('Impact Assessment')}</textarea>
                         </div>
                     </div>
                     ` : `
@@ -231,7 +243,7 @@ export function renderEdit(state) {
                                 <p class="text-[10px] text-slate-400 ml-4">Expected consequences across stakeholders and the Cardano ecosystem, plus measurable "Test" criteria.</p>
                                 ${renderToolbar('edit-analysis')}
                                 <textarea name="analysis" id="edit-analysis"
-                                    class="w-full bg-slate-50 dark:bg-slate-950 p-8 rounded-3xl min-h-[200px] font-medium text-lg outline-none border-2 border-transparent focus:border-blue-600 transition-all text-slate-900 dark:text-white">${getSection('Analysis & Test')}</textarea>
+                                    class="w-full bg-slate-50 dark:bg-slate-950 p-8 rounded-3xl min-h-[200px] font-medium text-lg outline-none border-2 border-transparent focus:border-blue-600 transition-all text-slate-900 dark:text-white">${getSection('Analysis & Test') || getSection('Analysis')}</textarea>
                             </div>
                         </div>
                     </div>
