@@ -310,7 +310,7 @@ ${getSection('Institutional Assets')}
                                 <i data-lucide="check" class="absolute w-4 h-4 text-white opacity-0 peer-checked:opacity-100 pointer-events-none"></i>
                             </div>
                             <span class="text-sm font-bold text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-colors leading-relaxed">
-                                I verify these modifications comply with the public consultation requirements for the amendment category and that I have documented all version changes.
+                                I have read and reviewed the changes and confirm I wish to make these edits.
                             </span>
                         </label>
                     </div>
