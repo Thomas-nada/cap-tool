@@ -793,7 +793,7 @@ window.handleEdit = async (event) => {
     const existingFm = extractAndUpdateFrontmatter(state.currentProposal?.body || '', title, category);
 
     try {
-        await updateGhIssueContent(p.number, title, existingFm + body, category, type, state.ghToken);
+        await updateGhIssueContent(p.number, title, existingFm + body, state.ghToken);
 
         for (const file of state.editFiles) {
             const path = `institutional-exhibits/${p.number}-${file.name}`;
