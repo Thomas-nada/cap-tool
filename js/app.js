@@ -1438,6 +1438,11 @@ window.editorSetLifecycle = async (stage) => {
         } else {
             state.currentProposal = await fetchProposalDetail(number, token);
         }
+        // Close the GitHub issue when moving to done so it appears in the Completed registry
+        if (stage === 'done') {
+            await updateIssueState(number, 'closed', token);
+            state.currentProposal = { ...state.currentProposal, state: 'closed' };
+        }
         // Log editor override in audit trail if author-ready was bypassed
         if (editorOverride) {
             const login = state.ghUser?.login || 'editor';
