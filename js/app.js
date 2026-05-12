@@ -1393,21 +1393,20 @@ window.editorSetLifecycle = async (stage) => {
     if (!state.isEditor || !state.currentProposal) return;
     const current = state.currentProposal.labels.find(l => LIFECYCLE_LABELS.includes(l.name))?.name || 'none';
 
-    // Forward transitions require the author to have signalled readiness first
+    // Forward transitions — warn if author hasn't signalled, but allow editor to override
     const FORWARD = { 'consultation': 'ready', 'ready': 'done' };
+    let editorOverride = false;
     if (FORWARD[current] === stage) {
         const authorReady = state.currentProposal.labels.some(l => l.name === 'author-ready');
         if (!authorReady) {
-            window.showToast(
-                'Author Signal Required',
-                'The author must signal readiness before this proposal can advance.',
-                'warning'
-            );
-            return;
+            if (!confirm(`The author has not signalled readiness.\n\nAdvance to "${stage}" anyway? This override will be permanently recorded in the audit trail.`)) return;
+            editorOverride = true;
+        } else {
+            if (!confirm(`Move proposal from "${current}" → "${stage}"?`)) return;
         }
+    } else {
+        if (!confirm(`Move proposal from "${current}" → "${stage}"?`)) return;
     }
-
-    if (!confirm(`Move proposal from "${current}" → "${stage}"?`)) return;
     const number = state.currentProposal.number;
     const token = state.ghToken;
     // Tags that are only meaningful in a specific stage — auto-clear when leaving that stage
@@ -1438,6 +1437,16 @@ window.editorSetLifecycle = async (stage) => {
             state.currentProposal = { ...state.currentProposal, labels: updatedLabels };
         } else {
             state.currentProposal = await fetchProposalDetail(number, token);
+        }
+        // Log editor override in audit trail if author-ready was bypassed
+        if (editorOverride) {
+            const login = state.ghUser?.login || 'editor';
+            const ts = new Date().toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+            postProposalComment(
+                number,
+                `<!-- PORTAL:EDITOR_OVERRIDE -->\n⚡ **Editor override** by @${login} — ${ts}\n\nProposal advanced to **${stage}** without author-ready signal.`,
+                token
+            ).catch(() => {});
         }
         state.proposalEvents = await fetchProposalEvents(number, token);
         updateUI(true);

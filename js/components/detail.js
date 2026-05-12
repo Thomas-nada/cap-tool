@@ -242,7 +242,8 @@ export function renderDetail(state) {
                             const SUGGESTION_MARKER = '<!-- PORTAL:EDIT_SUGGESTION -->';
                             const APPLIED_MARKER    = '<!-- PORTAL:EDIT_SUGGESTION:APPLIED -->';
                             const DISMISSED_MARKER  = '<!-- PORTAL:EDIT_SUGGESTION:DISMISSED -->';
-                            const SYSTEM_MARKERS    = [AUDIT_MARKER, SUGGESTION_MARKER, APPLIED_MARKER, DISMISSED_MARKER];
+                            const OVERRIDE_MARKER   = '<!-- PORTAL:EDITOR_OVERRIDE -->';
+                            const SYSTEM_MARKERS    = [AUDIT_MARKER, SUGGESTION_MARKER, APPLIED_MARKER, DISMISSED_MARKER, OVERRIDE_MARKER];
 
                             const systemComments = (state.comments || []).filter(c =>
                                 SYSTEM_MARKERS.some(m => c.body.includes(m))
@@ -250,6 +251,8 @@ export function renderDetail(state) {
                             const syntheticEvents = systemComments.map(c => {
                                 if (c.body.includes(AUDIT_MARKER))
                                     return { id: `audit-${c.id}`, event: 'portal_edit',               actor: c.user, created_at: c.created_at, html_url: c.html_url, _editBody: c.body.replace(AUDIT_MARKER, '').trim() };
+                                if (c.body.includes(OVERRIDE_MARKER))
+                                    return { id: `override-${c.id}`, event: 'portal_editor_override', actor: c.user, created_at: c.created_at, html_url: c.html_url, _overrideBody: c.body.replace(OVERRIDE_MARKER, '').trim() };
                                 if (c.body.includes(APPLIED_MARKER))
                                     return { id: `applied-${c.id}`, event: 'portal_suggestion_applied',   actor: c.user, created_at: c.created_at, html_url: c.html_url };
                                 if (c.body.includes(DISMISSED_MARKER))
@@ -843,6 +846,14 @@ function getEventDetails(event) {
             details.color = 'text-blue-500';
             details.message = '✏️ Proposal Edited';
             details.fullDescription = event._editBody || `**${event.actor?.login || 'The author'}** edited this proposal.`;
+            if (event.html_url) details.extUrl = event.html_url;
+            break;
+
+        case 'portal_editor_override':
+            details.icon = 'zap';
+            details.color = 'text-orange-500';
+            details.message = '⚡ Editor Override';
+            details.fullDescription = event._overrideBody || `**@${event.actor?.login || 'An editor'}** advanced this proposal without the author-ready signal.`;
             if (event.html_url) details.extUrl = event.html_url;
             break;
 
