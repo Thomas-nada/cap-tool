@@ -427,13 +427,34 @@ export function renderDetail(state) {
                                     const editorLogin  = activeSug.user?.login || 'editor';
                                     const suggDate     = new Date(activeSug.created_at).toLocaleDateString();
 
-                                    // Build a simple diff summary (which fields differ from current proposal)
-                                    const currentTitle = p.title;
-                                    const fieldLabels  = { title: 'Title', abstract: 'Summary', motivation: 'Motivation / Problem', analysis: 'Analysis', impact: 'Impact', exhibits: 'Links & Files', revisions: 'Revisions' };
-                                    const changedFields = fields ? Object.entries(fieldLabels).filter(([key]) => {
-                                        const curr = key === 'title' ? p.title : '';
-                                        return fields[key] && fields[key] !== curr;
-                                    }).map(([, label]) => label) : [];
+                                    // Extract current field values from proposal body for diff
+                                    const body = p.body || '';
+                                    const getField = (header) => {
+                                        const normalised = body.replace(/\r\n/g, '\n');
+                                        const escaped = header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                                        const regex = new RegExp(`### ${escaped}\\n([\\s\\S]*?)(?=\\n### |\\n## |$)`, 'i');
+                                        const match = normalised.match(regex);
+                                        return match ? match[1].trim() : '';
+                                    };
+                                    const isCIS = p.labels.some(l => l.name === 'CIS');
+                                    const FIELD_HEADERS = {
+                                        title:      null,
+                                        abstract:   'Summary',
+                                        motivation: isCIS ? 'Problem' : 'Why is this change needed?',
+                                        analysis:   isCIS ? 'Context' : 'Analysis & Test',
+                                        impact:     'Impact',
+                                        exhibits:   'Links and Files',
+                                        revisions:  'Structured Revisions (Contextual)',
+                                    };
+                                    const fieldLabels = { title: 'Title', abstract: 'Summary', motivation: isCIS ? 'Problem' : 'Motivation', analysis: isCIS ? 'Context' : 'Analysis', impact: 'Impact', exhibits: 'Links & Files', revisions: 'Revisions' };
+                                    const diffs = fields ? Object.entries(fieldLabels).map(([key, label]) => {
+                                        const curr = key === 'title' ? p.title : (FIELD_HEADERS[key] ? getField(FIELD_HEADERS[key]) : '');
+                                        const sugg = fields[key] || '';
+                                        if (!sugg || sugg === curr) return null;
+                                        return { key, label, curr, sugg };
+                                    }).filter(Boolean) : [];
+
+                                    const truncate = (s, n=220) => s.length > n ? s.slice(0, n) + '…' : s;
 
                                     return `
                                     <div class="rounded-2xl border-2 border-violet-200 dark:border-violet-800/40 bg-violet-50 dark:bg-violet-900/10 p-5 space-y-4">
@@ -445,16 +466,27 @@ export function renderDetail(state) {
                                             <span class="text-[9px] text-violet-400 font-bold">@${editorLogin} · ${suggDate}</span>
                                         </div>
 
-                                        ${changedFields.length > 0 ? `
-                                        <div class="space-y-1.5">
-                                            <p class="text-[9px] font-black uppercase text-violet-500 tracking-wider">Sections changed</p>
-                                            <div class="flex flex-wrap gap-1.5">
-                                                ${changedFields.map(f => `<span class="px-2.5 py-1 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 text-[9px] font-bold">${f}</span>`).join('')}
+                                        ${reason ? `<p class="text-[10px] text-violet-600 dark:text-violet-400 italic leading-relaxed"><span class="font-black not-italic">Reason:</span> ${reason}</p>` : ''}
+
+                                        ${diffs.length > 0 ? `
+                                        <div class="space-y-3">
+                                            <p class="text-[9px] font-black uppercase text-violet-500 tracking-wider">${diffs.length} section${diffs.length !== 1 ? 's' : ''} changed</p>
+                                            ${diffs.map(d => `
+                                            <div class="space-y-1.5">
+                                                <p class="text-[9px] font-black uppercase text-violet-500">${d.label}</p>
+                                                ${d.curr ? `
+                                                <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-xl p-3">
+                                                    <p class="text-[8px] font-black uppercase text-red-500 mb-1">Current</p>
+                                                    <p class="text-[10px] text-red-700 dark:text-red-300 leading-relaxed line-through opacity-70">${truncate(d.curr)}</p>
+                                                </div>` : ''}
+                                                <div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/40 rounded-xl p-3">
+                                                    <p class="text-[8px] font-black uppercase text-green-500 mb-1">Suggested</p>
+                                                    <p class="text-[10px] text-green-700 dark:text-green-300 leading-relaxed">${truncate(d.sugg)}</p>
+                                                </div>
                                             </div>
+                                            `).join('')}
                                         </div>
                                         ` : `<p class="text-[10px] text-violet-600 italic">Revision ready — click Apply to review the suggested changes.</p>`}
-
-                                        ${reason ? `<p class="text-[10px] text-violet-600 dark:text-violet-400 italic leading-relaxed"><span class="font-black not-italic">Reason:</span> ${reason}</p>` : ''}
 
                                         <div class="flex gap-2">
                                             <button onclick="window.applyEditorSuggestion('${encoded}', ${activeSug.id})"
