@@ -60,7 +60,7 @@ export function renderEdit(state) {
         // and "Why is this change needed?" has a bare `?` which makes `d` optional.
         const normalised = (p.body || '').replace(/\r\n/g, '\n');
         const escaped    = header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex      = new RegExp(`### ${escaped}\\n([\\s\\S]*?)(?=\\n## |$)`, 'i');
+        const regex      = new RegExp(`### ${escaped}\\n([\\s\\S]*?)(?=\\n### |\\n## |$)`, 'i');
         const match      = normalised.match(regex);
         return match ? match[1].trim() : '';
     };
