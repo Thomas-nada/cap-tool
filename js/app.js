@@ -1244,10 +1244,17 @@ async function loadProposals() {
     try {
         const ps = await fetchAllProposals(state.ghToken);
         state.proposals = ps;
+        // Mirror the kanban's bucketing: exclude CIS, fall unlabelled open→consultation, closed→done
+        const _stage = p => {
+            const lc = (p.labels || []).map(l => l.name.toLowerCase());
+            for (const s of ['consultation', 'ready', 'done', 'withdrawn']) { if (lc.includes(s)) return s; }
+            return p.state === 'closed' ? 'done' : 'consultation';
+        };
+        const capPs = ps.filter(x => !x.labels?.some(l => l.name === 'CIS'));
         state.stats = {
-            consultation: ps.filter(x => x.labels?.some(l => l.name === 'consultation')).length,
-            ready: ps.filter(x => x.labels?.some(l => l.name === 'ready')).length,
-            done: ps.filter(x => x.labels?.some(l => l.name === 'done')).length,
+            consultation: capPs.filter(x => _stage(x) === 'consultation').length,
+            ready: capPs.filter(x => _stage(x) === 'ready').length,
+            done: capPs.filter(x => _stage(x) === 'done').length,
         };
     } catch (e) {
         if (e.message === "AUTH_EXPIRED") {
