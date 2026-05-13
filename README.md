@@ -1,83 +1,127 @@
-# CAP Portal — Cardano Constitutional Amendment Portal
+# CAP Portal — Operational Guide
 
-A governance platform for managing Constitutional Amendment Proposals (CAPs) and Constitutional Information Submissions (CIS). Built with vanilla JavaScript, Tailwind CSS, and GitHub as the backend.
-
-**Live:** https://cap-portal.onrender.com
+This is a self-hostable governance portal. It uses **GitHub Issues as the data store**, a **small Flask service for OAuth**, and a **static frontend** served from anywhere. This guide covers everything needed to fork and run your own instance.
 
 ---
 
-## Features
+## Architecture
 
-- **Public read-only access** — anyone can browse proposals, view the constitution, and read guides without logging in
-- **GitHub OAuth login** — log in with your GitHub account to submit proposals and add comments
-- **Editor controls** — editors can manage lifecycle stages, signal labels, special handling flags, and suggest revisions directly on proposals (access managed via `editors.json`)
-- **Editor revision suggestions** — editors can suggest edits to a proposal using the actual proposal form; authors receive a notification card and can apply or dismiss the suggestion
-- **Audit trail** — every stage move, edit, signal change, and suggestion is recorded chronologically on the proposal; shows 5 most recent events with a "Show all" toggle
-- **Proposal Registry** — list and Kanban views with full-text search and filtering
-- **Constitution Viewer** — browse versions and compare diffs; select text to anchor CAP proposals
-- **Amendment Wizard** — step-by-step guided form for creating CAPs and CIS submissions
-- **Learning Hub** — guides and documentation for governance participants
-- **Dark mode** — full light/dark theme support
+```
+Browser → Static frontend (index.html + js/)
+             ↓ GitHub REST API (proposals, comments, labels)
+             ↓ Gatekeeper (gatekeeper/app.py) — OAuth token exchange only
+```
+
+The frontend is entirely static. The gatekeeper is a minimal Flask service whose only job is keeping your GitHub OAuth Client Secret off the client. All proposal data lives in GitHub Issues on a repo you control.
 
 ---
 
-## Authentication
+## What You Need
 
-The portal uses **GitHub OAuth** — no Personal Access Tokens required.
-
-- Public visitors can browse everything without logging in
-- Clicking "New CAP" or "Post Comment" prompts login
-- Login redirects through GitHub OAuth and back to the portal automatically
-
-The OAuth token exchange is handled by a small Flask gatekeeper service deployed at `https://cap-portal-auth.onrender.com`. This keeps the GitHub Client Secret server-side.
+- A GitHub account
+- Two GitHub repositories: one for the portal code (this repo), one for proposals (the "data repo")
+- A GitHub OAuth App
+- A place to host the static frontend (Render, Netlify, GitHub Pages, etc.)
+- A place to run the Flask gatekeeper (Render, Railway, Fly.io, etc.)
 
 ---
 
-## Editors
+## Step 1 — Create the Data Repo
 
-Editors have additional controls on proposal detail pages (lifecycle stage management, signal labels, special handling flags).
+Create a new GitHub repo (e.g. `your-org/proposals`). This is where proposals will be stored as Issues and the constitution will be read from.
 
-The list of editors is maintained in **`editors.json`** in the root of the `Thomas-nada/cap` GitHub repo:
+**Required repo contents:**
 
+`editors.json` in the root — list of GitHub usernames with editor access:
 ```json
-["Thomas-nada", "another-editor"]
+["your-github-username"]
 ```
 
-To add or remove editors, edit this file directly on GitHub. Changes take effect on the next login.
+`constitution/` folder — at least one `.md` file containing the document the portal will display. Filename becomes the version label shown in the UI (e.g. `v1.0.md`).
+
+**Required labels** — create these in the repo's Labels settings:
+
+| Purpose | Labels |
+|---------|--------|
+| Lifecycle stages | `consultation` `ready` `done` `withdrawn` |
+| Status tags | `review` `revision` `finalizing` `onchain` |
+| Editor signals | `editor-ok` `editor-concern` `editor-suggested` |
+| Author signal | `author-ready` |
+| Special handling | `major` `minor` `bundle` `fast-track` `pause` |
+| Document type | `CAP` `CIS` |
+
+Issues must be enabled on the repo.
 
 ---
 
-## Project Structure
+## Step 2 — Configure the Portal Code
+
+Fork this repo, then edit two files:
+
+**`js/config.js`** — point to your data repo:
+```js
+export const GITHUB_CONFIG = {
+    REPO_OWNER: "your-org",
+    REPO_NAME:  "proposals",
+    API_BASE:   "https://api.github.com"
+};
+
+export const EDITORS_FALLBACK = ['your-github-username'];
+```
+
+**`gatekeeper/app.py`** — update the CORS origins to your own URLs:
+```python
+CORS(app, origins=[
+    'https://your-portal.onrender.com',
+    'http://localhost:8765',
+])
+```
+
+---
+
+## Step 3 — Create the GitHub OAuth App
+
+Go to **GitHub → Settings → Developer settings → OAuth Apps → New OAuth App**.
+
+| Field | Value |
+|-------|-------|
+| Application name | Your portal name |
+| Homepage URL | Your frontend URL |
+| Authorization callback URL | Your frontend URL (same as homepage) |
+
+Note the **Client ID** and generate a **Client Secret** — you'll need both in the next step.
+
+---
+
+## Step 4 — Deploy the Gatekeeper
+
+The gatekeeper is a Flask app in `gatekeeper/`. Deploy it as a web service anywhere that can run Python.
+
+**Environment variables to set on the host:**
 
 ```
-cap-portal/
-├── index.html                  # Single-page app entry point
-├── styles.css                  # Global styles
-├── CAP.png                     # Logo
-├── dev-server.py               # Local development server (port 8765)
-├── gatekeeper/
-│   ├── app.py                  # Flask OAuth gatekeeper (deployed to Render)
-│   └── requirements.txt
-├── js/
-│   ├── app.js                  # App state, routing, all action handlers
-│   ├── api.js                  # GitHub API wrapper functions
-│   ├── config.js               # Repo owner/name, API base URL
-│   ├── env.js                  # GITHUB_TOKEN = null (OAuth used in production)
-│   └── components/
-│       ├── nav.js              # Navigation bar
-│       ├── landing.js          # Login page (shown before OAuth completes)
-│       ├── dashboard.js        # Home view with stats and activity
-│       ├── registry.js         # Proposal list/kanban registry
-│       ├── kanban.js           # Kanban board view
-│       ├── detail.js           # Proposal detail, comments, editor controls
-│       ├── wizard.js           # Step-by-step proposal creation wizard
-│       ├── create.js           # Direct form-based proposal creation
-│       ├── edit.js             # Edit existing proposals
-│       ├── constitution.js     # Constitution viewer with diff and text selection
-│       └── learn.js            # Guides and learning hub
-├── docs/guides/                # Markdown guide files for the Learn hub
-└── CAPs/                       # CAP document files (CAP-0001/, etc.)
+GITHUB_CLIENT_ID=<your OAuth app client ID>
+GITHUB_CLIENT_SECRET=<your OAuth app client secret>
 ```
+
+The app binds to `$PORT` automatically. The only route that matters is `GET /authenticate/<code>`.
+
+**On Render:** create a new Web Service, point it at the `gatekeeper/` directory, set build command `pip install -r requirements.txt` and start command `gunicorn app:app`.
+
+---
+
+## Step 5 — Deploy the Frontend
+
+The frontend is a static site — just `index.html`, `styles.css`, `CAP.png`, `js/`, `docs/`, and `cardano-constitution.md`. No build step.
+
+**`js/env.js`** — leave `GITHUB_TOKEN` as `null` in production. Users authenticate via OAuth at runtime:
+```js
+export const GITHUB_TOKEN = null;
+```
+
+Point your static host at the repo root. On Render: create a Static Site, set the publish directory to `/` (repo root).
+
+After deploying, go back to your GitHub OAuth App settings and confirm the **Authorization callback URL** matches your live frontend URL exactly.
 
 ---
 
@@ -85,70 +129,25 @@ cap-portal/
 
 ```bash
 python dev-server.py
-# Open: http://localhost:8765
+# Open http://localhost:8765
 ```
 
-The dev server serves the portal and handles ES6 module loading. OAuth login works on localhost because the GitHub OAuth app's callback URLs include `http://localhost:8765`.
+The dev server handles ES module loading and serves the app on port 8765. OAuth login works on localhost as long as `http://localhost:8765` is listed in your OAuth App's callback URLs.
 
-> **Note:** The Render free tier gatekeeper sleeps after inactivity. On first login after a period of inactivity, the auth exchange may take 20–30 seconds. The portal shows a "Warming up auth server…" message during this time.
-
----
-
-## Deployment
-
-The portal is deployed as two Render services:
-
-| Service | Type | URL |
-|---------|------|-----|
-| `cap-portal` | Static site | https://cap-portal.onrender.com |
-| `cap-portal-auth` | Flask web service | https://cap-portal-auth.onrender.com |
-
-The gatekeeper requires two environment variables set in Render:
-- `GITHUB_CLIENT_ID`
-- `GITHUB_CLIENT_SECRET`
-
-These come from the GitHub OAuth App registered at https://github.com/settings/developers.
-
----
-
-## GitHub Repository Setup
-
-The portal reads from and writes to `Thomas-nada/cap` on GitHub.
-
-Required repo structure:
-- Issues enabled (proposals are stored as GitHub Issues)
-- Labels matching the lifecycle stages: `consultation`, `ready`, `done`, `withdrawn`
-- Labels for status tags: `review`, `revision`, `finalizing`, `onchain`
-- Labels for editor signals: `editor-ok`, `editor-concern`, `editor-suggested`
-- Labels for author signal: `author-ready`
-- Labels for special handling: `major`, `minor`, `bundle`, `fast-track`, `pause`
-- Type labels: `CAP`, `CIS`
-- `constitution/` folder with at least one `.md` constitution file
-- `editors.json` in the root listing GitHub usernames who have editor access
-
-> **Note:** `draft`, `submitted`, and `Deliberation-Period` are legacy labels from earlier versions. New submissions enter at the `consultation` stage. Existing proposals with these legacy labels can be advanced to `consultation` using the editor lifecycle controls.
-
----
-
-## Technologies
-
-- **Frontend:** Vanilla JavaScript (ES6 modules), Tailwind CSS, Marked.js, Lucide Icons
-- **Backend:** GitHub REST API + GraphQL, Flask gatekeeper for OAuth
-- **Auth:** GitHub OAuth 2.0 (web flow)
-- **Hosting:** Render (static site + web service)
+For a GitHub PAT (skip OAuth locally), edit `js/env.js`:
+```js
+export const GITHUB_TOKEN = 'ghp_your_token_here';
+```
+Do not commit this value — `env.js` is gitignored.
 
 ---
 
 ## Troubleshooting
 
-**Blank page / module errors:**
-- Must be served over HTTP (not `file://` protocol) — use `python dev-server.py`
-- Clear browser cache and hard-reload (Ctrl+Shift+R)
+**Blank page / module errors** — the app must be served over HTTP, not opened as a `file://` URL. Use `python dev-server.py`.
 
-**Login doesn't work:**
-- The gatekeeper may be cold-starting — wait 30 seconds and try again
-- Check browser console for CORS errors; verify `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` are set in Render
+**Login fails silently** — open the browser console. A CORS error means the gatekeeper's allowed origins list doesn't include your frontend URL. A 401 from GitHub means the OAuth App credentials are wrong or the callback URL doesn't match exactly.
 
-**Not showing as editor:**
-- Confirm your GitHub username is listed in `editors.json` in the `Thomas-nada/cap` repo
-- Log out and back in — editor status is resolved at login time
+**Gatekeeper cold start** — on free-tier hosting the gatekeeper may sleep after inactivity. The first login after a dormant period can take 20–30 seconds. The portal displays a "Warming up…" message during this.
+
+**Not showing as editor** — editor status is resolved at login time from `editors.json` in the data repo. Edit that file and log out and back in.
